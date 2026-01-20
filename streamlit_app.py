@@ -109,6 +109,25 @@ def calcular_macros_objetivo(sexo, edad, altura, peso, pct_grasa, actividad, obj
         "dietas_posibles": dietas_posibles
     }
 
+def estimar_pct_grasa(sexo, categoria):
+    if sexo.lower() == "hombre":
+        mapa = {
+            "Delgado": 12,
+            "Normal": 18,
+            "Relleno": 25,
+            "Obeso": 32
+        }
+    else:
+        mapa = {
+            "Delgado": 20,
+            "Normal": 26,
+            "Relleno": 33,
+            "Obeso": 40
+        }
+
+    return mapa.get(categoria, 18)
+
+
 # -----------------------------
 # EJEMPLO DE USUARIO
 # -----------------------------
@@ -124,15 +143,91 @@ usuario = {
 
 resultado = calcular_macros_objetivo(**usuario)
 
-st.write("Macros y calorías:")
-st.write(f"Calorías: {resultado['calorias']}")
-st.write(f"Proteína: {resultado['proteina_g']} g")
-st.write(f"Grasas: {resultado['grasas_g']} g")
-st.write(f"Carbohidratos: {resultado['carbos_g']} g")
+# Aqui comienza la aplicación Streamlit
+st.set_page_config(page_title="SmartEatAI", layout="centered")
+st.title("SmartEatAI - Cálculo de Macros")
 
-st.write("Dietas posibles:")
-st.write(resultado['dietas_posibles'])
+st.write("Introduce tus datos físicos y tu objetivo. Calcularemos tus macros diarios de forma personalizada.")
 
-# Si quieres permitir al usuario seleccionar una dieta:
-seleccion_dieta = st.selectbox("Elige tu dieta preferida", resultado['dietas_posibles'])
-st.write("Has seleccionado:", seleccion_dieta)
+with st.form("form_macros"):
+    col1, col2 = st.columns(2)
+
+    with col1:
+        sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
+        edad = st.number_input("Edad (años)", min_value=10, max_value=100, value=28)
+        altura = st.number_input("Altura (cm)", min_value=120, max_value=230, value=175)
+
+    with col2:
+        peso = st.number_input("Peso (kg)", min_value=30.0, max_value=250.0, value=70.0)
+
+        modo_grasa = st.radio(
+            "¿Cómo quieres indicar tu grasa corporal?",
+            ["Seleccionar tipo de cuerpo", "Introducir % exacto"]
+        )
+
+        if modo_grasa == "Seleccionar tipo de cuerpo":
+            categoria_grasa = st.selectbox(
+                "Tipo de cuerpo",
+                ["Delgado", "Normal", "Relleno", "Obeso"]
+            )
+            pct_grasa_input = None
+        else:
+            pct_grasa_input = st.number_input(
+                "Porcentaje de grasa corporal (%)",
+                min_value=5.0,
+                max_value=60.0,
+                value=18.0
+            )
+            categoria_grasa = None
+
+    actividad = st.selectbox(
+        "Nivel de actividad",
+        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"]
+    )
+
+
+    objetivo = st.selectbox(
+        "Objetivo",
+        ["ganar_musculo", "perder_peso", "recomposición"]
+    )
+
+    submitted = st.form_submit_button("Calcular macros")
+
+if modo_grasa == "Seleccionar tipo de cuerpo":
+    pct_grasa = estimar_pct_grasa(sexo, categoria_grasa)
+else:
+    pct_grasa = pct_grasa_input
+
+
+if submitted:
+    resultado = calcular_macros_objetivo(
+        sexo=sexo,
+        edad=edad,
+        altura=altura,
+        peso=peso,
+        pct_grasa=pct_grasa,
+        actividad=actividad,
+        objetivo=objetivo
+    )
+
+    st.subheader("Resultados personalizados")
+
+    colA, colB = st.columns(2)
+
+    with colA:
+        st.metric("Calorías (kcal/día)", resultado["calorias"])
+        st.metric("Proteína (g/día)", resultado["proteina_g"])
+
+    with colB:
+        st.metric("Grasas (g/día)", resultado["grasas_g"])
+        st.metric("Carbohidratos (g/día)", resultado["carbos_g"])
+
+    st.subheader("Dietas recomendadas")
+    seleccion_dieta = st.selectbox(
+        "Elige tu dieta preferida",
+        resultado["dietas_posibles"]
+    )
+
+    st.success(f"Has seleccionado: {seleccion_dieta}")
+
+    st.caption("Disciplina diaria + datos correctos = físico de alto rendimiento.")
