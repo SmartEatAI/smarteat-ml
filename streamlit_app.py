@@ -1,15 +1,9 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import joblib
-import json
 
-# -----------------------------
-# FUNCIÓN: Calorías y Macros
-# -----------------------------
 def calcular_macros_objetivo(sexo, edad, altura, peso, pct_grasa, actividad, objetivo):
     """
     Calcula calorías y macros ajustados según objetivo del usuario
+    y devuelve una lista de dietas posibles.
     """
     # Masa magra
     masa_magra = peso * (1 - pct_grasa / 100)
@@ -51,28 +45,24 @@ def calcular_macros_objetivo(sexo, edad, altura, peso, pct_grasa, actividad, obj
     carbos = round((calorias - (proteina*4 + grasas*9))/4)
 
     # -----------------------------
-    # Asignación de tipo de dieta
+    # Lista de posibles dietas
     # -----------------------------
-    dietas = ["keto", "low-carb", "balanceada", "alta en carbohidratos", 
-              "alta en proteína", "mediterránea", "vegana", "paleo", "flexitariana"]
-
-    # Reglas simples para seleccionar dieta
     if objetivo == "ganar_musculo":
-        tipo_dieta = ["alta en proteína", "balanceada", "mediterránea"]
+        dietas_posibles = ["alta en proteína", "balanceada", "mediterránea"]
     elif objetivo == "perder_peso":
         if pct_grasa > 25:
-            tipo_dieta = ["low-carb", "keto", "paleo"]
+            dietas_posibles = ["low-carb", "keto", "paleo"]
         else:
-            tipo_dieta = ["balanceada", "mediterránea", "flexitariana"]
+            dietas_posibles = ["balanceada", "mediterránea", "flexitariana"]
     else:  # recomposición
-        tipo_dieta = ["balanceada", "mediterránea", "flexitariana", "alta en proteína"]
+        dietas_posibles = ["balanceada", "mediterránea", "flexitariana", "alta en proteína"]
 
     return {
         "calorias": round(calorias),
         "proteina_g": proteina,
         "grasas_g": grasas,
         "carbos_g": carbos,
-        "tipo_dieta": tipo_dieta
+        "dietas_posibles": dietas_posibles
     }
 
 usuario = {
@@ -85,8 +75,17 @@ usuario = {
     "objetivo": "ganar_musculo"
 }
 
-macros = calcular_macros_objetivo(**usuario)
-print("Macros y tipo de dieta:")
-print(macros)
+resultado = calcular_macros_objetivo(**usuario)
 
-st.write(macros)
+st.write("Macros y calorías:")
+st.write(f"Calorías: {resultado['calorias']}")
+st.write(f"Proteína: {resultado['proteina_g']} g")
+st.write(f"Grasas: {resultado['grasas_g']} g")
+st.write(f"Carbohidratos: {resultado['carbos_g']} g")
+
+st.write("Dietas posibles:")
+st.write(resultado['dietas_posibles'])
+
+# Si quieres permitir al usuario seleccionar una dieta:
+seleccion_dieta = st.selectbox("Elige tu dieta preferida", resultado['dietas_posibles'])
+st.write("Has seleccionado:", seleccion_dieta)
