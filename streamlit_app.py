@@ -230,6 +230,7 @@ if calcular:
 
     dietas_recomendadas = resultado["dietas_posibles"]
 
+    # Construir etiquetas UI
     opciones_ui = []
     for dieta in TODAS_LAS_DIETAS:
         if dieta in dietas_recomendadas:
@@ -237,13 +238,21 @@ if calcular:
         else:
             opciones_ui.append(dieta)
 
-    seleccion_ui = st.selectbox(
-        "Elige tu dieta preferida",
-        opciones_ui
+    # Preseleccionar las recomendadas
+    default_ui = [
+        f"{dieta}  [RECOMENDADA]"
+        for dieta in dietas_recomendadas
+    ]
+
+    seleccion_ui = st.multiselect(
+        "Elige una o varias dietas según tus preferencias",
+        opciones_ui,
+        default=default_ui
     )
 
-    # Limpiar la selección
-    seleccion_dieta = (
-        seleccion_ui
-        .replace("  [RECOMENDADA]", "")
-    )
+    # Limpiar selección
+    dietas_seleccionadas = [
+        d.replace("  [RECOMENDADA]", "")
+        for d in seleccion_ui
+    ]
+
