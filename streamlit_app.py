@@ -140,6 +140,11 @@ with col1:
     sexo = st.selectbox("Sexo", ["Hombre", "Mujer"], key="sexo")
     edad = st.number_input("Edad (años)", min_value=10, max_value=100, value=28, key="edad")
     altura = st.number_input("Altura (cm)", min_value=120, max_value=230, value=175, key="altura")
+    actividad = st.selectbox(
+            "Nivel de actividad",
+            ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"],
+            key="actividad"
+        )
 
 with col2:
     peso = st.number_input("Peso (kg)", min_value=30.0, max_value=250.0, value=70.0, key="peso")
@@ -167,17 +172,13 @@ with col2:
         )
         categoria_grasa = None
 
-    actividad = st.selectbox(
-        "Nivel de actividad",
-        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"],
-        key="actividad"
-    )
+    
 
-objetivo = st.selectbox(
-    "Objetivo",
-    ["ganar_musculo", "perder_peso", "recomposición"],
-    key="objetivo"
-)
+    objetivo = st.selectbox(
+        "Objetivo",
+        ["ganar_musculo", "perder_peso", "recomposición"],
+        key="objetivo"
+    )
 
 calcular = st.button("Calcular macros")
 
@@ -209,10 +210,40 @@ if calcular:
         st.metric("Grasas (g/día)", resultado["grasas_g"])
         st.metric("Carbohidratos (g/día)", resultado["carbos_g"])
 
-    st.subheader("Dietas recomendadas")
-    seleccion_dieta = st.selectbox(
-        "Elige tu dieta preferida",
-        resultado["dietas_posibles"]
-    )
-
     st.caption(f"Porcentaje de grasa usado en el cálculo: {round(pct_grasa, 1)}%")
+
+TODAS_LAS_DIETAS = [
+    "alta en proteína",
+    "balanceada",
+    "mediterránea",
+    "low-carb",
+    "keto",
+    "paleo",
+    "flexitariana",
+    "vegetariana",
+    "vegana",
+    "sin gluten",
+    "halal"
+]
+
+st.subheader("Opciones de dieta")
+
+dietas_recomendadas = resultado["dietas_posibles"]
+
+opciones_ui = []
+for dieta in TODAS_LAS_DIETAS:
+    if dieta in dietas_recomendadas:
+        opciones_ui.append(f"{dieta}  [RECOMENDADA]")
+    else:
+        opciones_ui.append(dieta)
+
+seleccion_ui = st.selectbox(
+    "Elige tu dieta preferida",
+    opciones_ui
+)
+
+# Limpiar la selección
+seleccion_dieta = (
+    seleccion_ui
+    .replace("  [RECOMENDADA]", "")
+)
