@@ -85,7 +85,7 @@ usuario = {
     "objetivo": "ganar_musculo"
 }
 
-macros = calcular_macros_objetivo(usuario)
+macros = calcular_macros_objetivo(**usuario)
 print("Macros y tipo de dieta:")
 print(macros)
 
