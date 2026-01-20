@@ -127,6 +127,20 @@ def estimar_pct_grasa(sexo, categoria):
 
     return mapa.get(categoria, 18)
 
+TODAS_LAS_DIETAS = [
+    "alta en proteína",
+    "balanceada",
+    "mediterránea",
+    "low-carb",
+    "keto",
+    "paleo",
+    "flexitariana",
+    "vegetariana",
+    "vegana",
+    "sin gluten",
+    "halal"
+]
+
 # Aqui comienza la aplicación Streamlit
 
 st.set_page_config(page_title="SmartEatAI", layout="centered")
@@ -212,38 +226,24 @@ if calcular:
 
     st.caption(f"Porcentaje de grasa usado en el cálculo: {round(pct_grasa, 1)}%")
 
-TODAS_LAS_DIETAS = [
-    "alta en proteína",
-    "balanceada",
-    "mediterránea",
-    "low-carb",
-    "keto",
-    "paleo",
-    "flexitariana",
-    "vegetariana",
-    "vegana",
-    "sin gluten",
-    "halal"
-]
+    st.subheader("Opciones de dieta")
 
-st.subheader("Opciones de dieta")
+    dietas_recomendadas = resultado["dietas_posibles"]
 
-dietas_recomendadas = resultado["dietas_posibles"]
+    opciones_ui = []
+    for dieta in TODAS_LAS_DIETAS:
+        if dieta in dietas_recomendadas:
+            opciones_ui.append(f"{dieta}  [RECOMENDADA]")
+        else:
+            opciones_ui.append(dieta)
 
-opciones_ui = []
-for dieta in TODAS_LAS_DIETAS:
-    if dieta in dietas_recomendadas:
-        opciones_ui.append(f"{dieta}  [RECOMENDADA]")
-    else:
-        opciones_ui.append(dieta)
+    seleccion_ui = st.selectbox(
+        "Elige tu dieta preferida",
+        opciones_ui
+    )
 
-seleccion_ui = st.selectbox(
-    "Elige tu dieta preferida",
-    opciones_ui
-)
-
-# Limpiar la selección
-seleccion_dieta = (
-    seleccion_ui
-    .replace("  [RECOMENDADA]", "")
-)
+    # Limpiar la selección
+    seleccion_dieta = (
+        seleccion_ui
+        .replace("  [RECOMENDADA]", "")
+    )
