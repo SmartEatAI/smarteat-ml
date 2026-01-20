@@ -143,6 +143,19 @@ TODAS_LAS_DIETAS = [
 
 # Aqui comienza la aplicación Streamlit
 
+if "calculado" not in st.session_state:
+    st.session_state.calculado = False
+
+if "dietas_seleccionadas" not in st.session_state:
+    st.session_state.dietas_seleccionadas = []
+
+if "resultado" not in st.session_state:
+    st.session_state.resultado = None
+
+if "pct_grasa_usado" not in st.session_state:
+    st.session_state.pct_grasa_usado = None
+
+
 st.set_page_config(page_title="SmartEatAI", layout="centered")
 st.title("SmartEatAI - Cálculo de Macros")
 
@@ -155,10 +168,10 @@ with col1:
     edad = st.number_input("Edad (años)", min_value=10, max_value=100, value=28, key="edad")
     altura = st.number_input("Altura (cm)", min_value=120, max_value=230, value=175, key="altura")
     actividad = st.selectbox(
-            "Nivel de actividad",
-            ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"],
-            key="actividad"
-        )
+        "Nivel de actividad",
+        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"],
+        key="actividad"
+    )
 
 with col2:
     peso = st.number_input("Peso (kg)", min_value=30.0, max_value=250.0, value=70.0, key="peso")
@@ -186,17 +199,13 @@ with col2:
         )
         categoria_grasa = None
 
-    
-
     objetivo = st.selectbox(
         "Objetivo",
         ["ganar_musculo", "perder_peso", "recomposición"],
         key="objetivo"
     )
 
-calcular = st.button("Calcular macros")
-
-if calcular:
+if st.button("Calcular macros"):
     if modo_grasa == "Seleccionar tipo de cuerpo":
         pct_grasa = estimar_pct_grasa(sexo, categoria_grasa)
     else:
@@ -212,6 +221,19 @@ if calcular:
         objetivo=objetivo
     )
 
+    st.session_state.resultado = resultado
+    st.session_state.pct_grasa_usado = pct_grasa
+    st.session_state.calculado = True
+
+    # Resetear selección a recomendadas
+    st.session_state.dietas_seleccionadas = resultado["dietas_posibles"]
+
+
+if st.session_state.calculado and st.session_state.resultado:
+
+    resultado = st.session_state.resultado
+    pct_grasa = st.session_state.pct_grasa_usado
+
     st.subheader("Resultados personalizados")
 
     colA, colB = st.columns(2)
@@ -226,11 +248,13 @@ if calcular:
 
     st.caption(f"Porcentaje de grasa usado en el cálculo: {round(pct_grasa, 1)}%")
 
+    # -----------------------------
+    # DIETAS MULTISELECT
+    # -----------------------------
     st.subheader("Opciones de dieta")
 
     dietas_recomendadas = resultado["dietas_posibles"]
 
-    # Construir etiquetas UI
     opciones_ui = []
     for dieta in TODAS_LAS_DIETAS:
         if dieta in dietas_recomendadas:
@@ -238,16 +262,22 @@ if calcular:
         else:
             opciones_ui.append(dieta)
 
-    # Preseleccionar las recomendadas
-    default_ui = [
-        f"{dieta}  [RECOMENDADA]"
-        for dieta in dietas_recomendadas
-    ]
+    if st.session_state.dietas_seleccionadas:
+        default_ui = [
+            f"{d}  [RECOMENDADA]" if d in dietas_recomendadas else d
+            for d in st.session_state.dietas_seleccionadas
+        ]
+    else:
+        default_ui = [
+            f"{d}  [RECOMENDADA]"
+            for d in dietas_recomendadas
+        ]
 
     seleccion_ui = st.multiselect(
         "Elige una o varias dietas según tus preferencias",
         opciones_ui,
-        default=default_ui
+        default=default_ui,
+        key="dietas_ui"
     )
 
-
+    st.session_state.dietas_seleccionadas = dietas_seleccionadas
