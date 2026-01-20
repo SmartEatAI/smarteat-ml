@@ -248,9 +248,6 @@ if st.session_state.calculado and st.session_state.resultado:
 
     st.caption(f"Porcentaje de grasa usado en el cálculo: {round(pct_grasa, 1)}%")
 
-    # -----------------------------
-    # DIETAS MULTISELECT
-    # -----------------------------
     st.subheader("Opciones de dieta")
 
     dietas_recomendadas = resultado["dietas_posibles"]
@@ -269,8 +266,8 @@ if st.session_state.calculado and st.session_state.resultado:
         ]
     else:
         default_ui = [
-            f"{d}  [RECOMENDADA]"
-            for d in dietas_recomendadas
+            f"{dieta}  [RECOMENDADA]"
+            for dieta in dietas_recomendadas
         ]
 
     seleccion_ui = st.multiselect(
@@ -280,4 +277,11 @@ if st.session_state.calculado and st.session_state.resultado:
         key="dietas_ui"
     )
 
+    # Limpiar selección
+    dietas_seleccionadas = [
+        d.replace("  [RECOMENDADA]", "")
+        for d in seleccion_ui
+    ]
+
+    # GUARDAR ESTADO AQUÍ (no fuera)
     st.session_state.dietas_seleccionadas = dietas_seleccionadas
