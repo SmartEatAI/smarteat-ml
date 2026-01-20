@@ -127,79 +127,66 @@ def estimar_pct_grasa(sexo, categoria):
 
     return mapa.get(categoria, 18)
 
-
-# -----------------------------
-# EJEMPLO DE USUARIO
-# -----------------------------
-usuario = {
-    "sexo": "Hombre",
-    "edad": 28,
-    "altura": 175,       # cm
-    "peso": 70,          # kg
-    "pct_grasa": 18,     # % grasa corporal
-    "actividad": "muy_alto",
-    "objetivo": "ganar_musculo"
-}
-
-resultado = calcular_macros_objetivo(**usuario)
-
 # Aqui comienza la aplicación Streamlit
+
 st.set_page_config(page_title="SmartEatAI", layout="centered")
 st.title("SmartEatAI - Cálculo de Macros")
 
 st.write("Introduce tus datos físicos y tu objetivo. Calcularemos tus macros diarios de forma personalizada.")
 
-with st.form("form_macros"):
-    col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
 
-    with col1:
-        sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
-        edad = st.number_input("Edad (años)", min_value=10, max_value=100, value=28)
-        altura = st.number_input("Altura (cm)", min_value=120, max_value=230, value=175)
+with col1:
+    sexo = st.selectbox("Sexo", ["Hombre", "Mujer"], key="sexo")
+    edad = st.number_input("Edad (años)", min_value=10, max_value=100, value=28, key="edad")
+    altura = st.number_input("Altura (cm)", min_value=120, max_value=230, value=175, key="altura")
 
-    with col2:
-        peso = st.number_input("Peso (kg)", min_value=30.0, max_value=250.0, value=70.0)
+with col2:
+    peso = st.number_input("Peso (kg)", min_value=30.0, max_value=250.0, value=70.0, key="peso")
 
-        modo_grasa = st.radio(
-            "¿Cómo quieres indicar tu grasa corporal?",
-            ["Seleccionar tipo de cuerpo", "Introducir % exacto"]
+    modo_grasa = st.radio(
+        "¿Cómo quieres indicar tu grasa corporal?",
+        ["Seleccionar tipo de cuerpo", "Introducir % exacto"],
+        key="modo_grasa"
+    )
+
+    if modo_grasa == "Seleccionar tipo de cuerpo":
+        categoria_grasa = st.selectbox(
+            "Tipo de cuerpo",
+            ["Delgado", "Normal", "Relleno", "Obeso"],
+            key="categoria_grasa"
         )
-
-        if modo_grasa == "Seleccionar tipo de cuerpo":
-            categoria_grasa = st.selectbox(
-                "Tipo de cuerpo",
-                ["Delgado", "Normal", "Relleno", "Obeso"]
-            )
-            pct_grasa_input = None
-        else:
-            pct_grasa_input = st.number_input(
-                "Porcentaje de grasa corporal (%)",
-                min_value=5.0,
-                max_value=60.0,
-                value=18.0
-            )
-            categoria_grasa = None
+        pct_grasa_input = None
+    else:
+        pct_grasa_input = st.number_input(
+            "Porcentaje de grasa corporal (%)",
+            min_value=5.0,
+            max_value=60.0,
+            value=18.0,
+            key="pct_grasa_input"
+        )
+        categoria_grasa = None
 
     actividad = st.selectbox(
         "Nivel de actividad",
-        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"]
+        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"],
+        key="actividad"
     )
 
+objetivo = st.selectbox(
+    "Objetivo",
+    ["ganar_musculo", "perder_peso", "recomposición"],
+    key="objetivo"
+)
 
-    objetivo = st.selectbox(
-        "Objetivo",
-        ["ganar_musculo", "perder_peso", "recomposición"]
-    )
+calcular = st.button("Calcular macros")
 
-    submitted = st.form_submit_button("Calcular macros")
+if calcular:
+    if modo_grasa == "Seleccionar tipo de cuerpo":
+        pct_grasa = estimar_pct_grasa(sexo, categoria_grasa)
+    else:
+        pct_grasa = pct_grasa_input
 
-if modo_grasa == "Seleccionar tipo de cuerpo":
-    pct_grasa = estimar_pct_grasa(sexo, categoria_grasa)
-else:
-    pct_grasa = pct_grasa_input
-
-
-if submitted:
     resultado = calcular_macros_objetivo(
         sexo=sexo,
         edad=edad,
@@ -228,6 +215,4 @@ if submitted:
         resultado["dietas_posibles"]
     )
 
-    st.success(f"Has seleccionado: {seleccion_dieta}")
-
-    st.caption("Disciplina diaria + datos correctos = físico de alto rendimiento.")
+    st.caption(f"Porcentaje de grasa usado en el cálculo: {round(pct_grasa, 1)}%")
