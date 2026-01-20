@@ -250,9 +250,4 @@ if calcular:
         default=default_ui
     )
 
-    # Limpiar selección
-    dietas_seleccionadas = [
-        d.replace("  [RECOMENDADA]", "")
-        for d in seleccion_ui
-    ]
 
