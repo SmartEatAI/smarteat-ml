@@ -5,19 +5,18 @@ import pandas as pd
 import numpy as np
 import gdown
 
+
+from joblib import load
+
+df = load("df_recetas.joblib")
+scaler = load("scaler.joblib")
+knn = load("knn.joblib")
+
 @st.cache_resource
 def cargar_modelos():
-    gdown.download(
-        "https://drive.google.com/uc?id=10UuMfA8z1KukoWDPvDUdnFCn_xonQwew",
-        "files/df_recetas.pkl", quiet=True)
-    with open("files/df_recetas.pkl", "rb") as f:
-        df = pickle.load(f)
-
-    with open("files/scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
-
-    with open("files/knn.pkl", "rb") as f:
-        knn = pickle.load(f)
+    df = load("files/df_recetas.joblib")
+    scaler = load("files/scaler.joblib")
+    knn = load("files/knn.joblib")
 
     return df, scaler, knn
 
