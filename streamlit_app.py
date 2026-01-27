@@ -164,6 +164,11 @@ if "recetas" in st.session_state:
 
     for i, receta in st.session_state.recetas.iterrows():
         st.markdown(f"### {receta['name']}")
+        st.write("**Macros:**")
+        st.write(f"- Calorías: {float(receta['nutrition'][0])}")
+        st.write(f"- Proteína: {float(receta['nutrition'][4])} g")
+        st.write(f"- Grasa: {float(receta['nutrition'][1])} g")
+        st.write(f"- Carbohidratos: {float(receta['nutrition'][6])} g")
         st.write("**Ingredientes:**")
         st.write(receta["ingredientes"])
 
@@ -174,4 +179,10 @@ if "recetas" in st.session_state:
             if nueva is not None:
                 st.success(f"Alternativa: {nueva['name']}")
                 st.write(f"{nueva}")
+                st.write("**Macros:**")
+                st.write(f"- Calorías: {float(nueva['nutrition'][0])}")
+                st.write(f"- Proteína: {float(nueva['nutrition'][4])} g")
+                st.write(f"- Grasa: {float(nueva['nutrition'][1])} g")
+                st.write(f"- Carbohidratos: {float(nueva['nutrition'][6])} g")
+
                 st.write(nueva["ingredientes"])
