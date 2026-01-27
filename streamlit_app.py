@@ -167,7 +167,7 @@ if "recetas" in st.session_state:
         st.write(f"- Grasa: {receta['FatContent']} g")
         st.write(f"- Carbohidratos: {receta['CarbohydrateContent']} g")
         st.write("**Ingredientes:**")
-        st.write(receta["ingredientes"])
+        st.write(receta['RecipeIngredientParts'])
 
         if st.button("Cambiar por similar", key=f"swap_{receta['id']}"):
             nueva = cambiar_por_similar(
@@ -181,4 +181,4 @@ if "recetas" in st.session_state:
                 st.write(f"- Grasa: {nueva['FatContent']} g")
                 st.write(f"- Carbohidratos: {nueva['CarbohydrateContent']} g")
 
-                st.write(nueva["ingredientes"])
+                st.write(nueva['RecipeIngredientParts'])
