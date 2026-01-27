@@ -160,7 +160,7 @@ if "recetas" in st.session_state:
     st.subheader("🍽️ Comidas recomendadas")
 
     for i, receta in st.session_state.recetas.iterrows():
-        st.markdown(f"### {receta['name']}")
+        st.markdown(f"### {receta['Name']}")
         st.write("**Macros:**")
         st.write(f"- Calorías: {receta['Calories']} kcal")
         st.write(f"- Proteína: {receta['ProteinContent']} g")
@@ -174,7 +174,7 @@ if "recetas" in st.session_state:
                 receta["id"]
             )
             if nueva is not None:
-                st.success(f"Alternativa: {nueva['name']}")
+                st.success(f"Alternativa: {nueva['Name']}")
                 st.write("**Macros:**")
                 st.write(f"- Calorías: {nueva['Calories']} kcal")
                 st.write(f"- Proteína: {nueva['ProteinContent']} g")
