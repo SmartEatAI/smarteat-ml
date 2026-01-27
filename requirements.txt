@@ -2,5 +2,4 @@ streamlit
 scikit-learn
 joblib
 numpy
-pickle
 gdown
