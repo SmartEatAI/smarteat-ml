@@ -173,4 +173,5 @@ if "recetas" in st.session_state:
             )
             if nueva is not None:
                 st.success(f"Alternativa: {nueva['name']}")
+                st.write(f"{nueva}")
                 st.write(nueva["ingredientes"])
