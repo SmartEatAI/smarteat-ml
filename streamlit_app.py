@@ -4,13 +4,7 @@ import ast
 import pandas as pd
 import numpy as np
 import gdown
-
-
 from joblib import load
-
-df = load("df_recetas.joblib")
-scaler = load("scaler.joblib")
-knn = load("knn.joblib")
 
 @st.cache_resource
 def cargar_modelos():
