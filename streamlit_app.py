@@ -182,7 +182,6 @@ if "recetas" in st.session_state:
             if nueva is not None:
                 nutrition = ast.literal_eval(nueva["nutrition"])
                 st.success(f"Alternativa: {nueva['name']}")
-                st.write(f"{nueva}")
                 st.write("**Macros:**")
                 st.write(f"- Calorías: {float(nutrition[0])} kcal")
                 st.write(f"- Proteína: {float(nutrition[4])} g")
