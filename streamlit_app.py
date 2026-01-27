@@ -165,7 +165,7 @@ if "recetas" in st.session_state:
     for i, receta in st.session_state.recetas.iterrows():
         st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
-        st.write(f"{receta['nutrition'][0]} kcal | ")
+        st.write(f"- {float(receta['nutrition'][0])} kcal")
         # st.write(f"- Calorías: {float(receta['nutrition'][0])}")
         # st.write(f"- Proteína: {float(receta['nutrition'][4])} g")
         # st.write(f"- Grasa: {float(receta['nutrition'][1])} g")
