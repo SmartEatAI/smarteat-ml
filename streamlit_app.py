@@ -4,8 +4,6 @@ import pandas as pd
 import numpy as np
 import gdown
 
-
-
 @st.cache_resource
 def cargar_modelos():
     gdown.download(
@@ -29,11 +27,7 @@ FEATURES = [
     "calorias", "proteina", "grasa", "carbos",
 ]
 
-def recomendar_recetas(macros_obj, dietas, n=3):
-    subset = df_recetas[df_recetas["dieta"].isin(dietas)]
-
-    if subset.empty:
-        return pd.DataFrame()
+def recomendar_recetas(macros_obj, n=3):
 
     user_vec = scaler.transform([[
         macros_obj["calorias"],
@@ -42,16 +36,18 @@ def recomendar_recetas(macros_obj, dietas, n=3):
         macros_obj["carbos"]
     ]])
 
-    X_subset = scaler.transform(subset[FEATURES])
+    X_scaled = scaler.transform(df_recetas[FEATURES])
 
     distances, idxs = knn.kneighbors(
         user_vec,
-        n_neighbors=min(n, len(X_subset))
+        n_neighbors=min(n, len(df_recetas))
     )
 
-    return subset.iloc[idxs[0]]
+    return df_recetas.iloc[idxs[0]]
 
-def cambiar_por_similar(receta_id, dietas):
+
+def cambiar_por_similar(receta_id):
+
     idx = df_recetas[df_recetas["id"] == receta_id].index[0]
 
     X_rec = scaler.transform([df_recetas.loc[idx, FEATURES]])
@@ -59,11 +55,10 @@ def cambiar_por_similar(receta_id, dietas):
     distances, idxs = knn.kneighbors(X_rec, n_neighbors=8)
 
     for i in idxs[0][1:]:
-        r = df_recetas.iloc[i]
-        if r["dieta"] in dietas:
-            return r
+        return df_recetas.iloc[i]
 
     return None
+
 
 def estimar_pct_grasa(sexo, categoria):
     if sexo == "Hombre":
