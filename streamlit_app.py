@@ -52,7 +52,7 @@ def cambiar_por_similar(receta_id):
 
     X_rec = scaler.transform([df_recetas.loc[idx, FEATURES]])
 
-    distances, idxs = knn.kneighbors(X_rec, n_neighbors=8)
+    distances, idxs = knn.kneighbors(X_rec, n_neighbors=4)
 
     for i in idxs[0][1:]:
         return df_recetas.iloc[i]
