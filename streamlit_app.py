@@ -1,287 +1,183 @@
 import streamlit as st
+import pickle
+import pandas as pd
+import numpy as np
+import gdown
 
-def calcular_macros_objetivo(sexo, edad, altura, peso, pct_grasa, actividad, objetivo):
-    """
-    Calcula calorías y macros ajustados según el objetivo del usuario
-    y devuelve una lista de dietas posibles.
 
-    Parámetros de entrada:
-    - sexo: 'Hombre' o 'Mujer'
-    - edad: años
-    - altura: cm
-    - peso: kg
-    - pct_grasa: porcentaje de grasa corporal (%)
-    - actividad: nivel de actividad física ('sedentario', 'ligero', 'moderado', 'alto', 'muy alto')
-    - objetivo: 'ganar_musculo', 'perder_peso' o 'recomposición'
 
-    Retorna un diccionario con:
-    - calorias: calorías diarias necesarias (kcal)
-    - proteina_g: gramos de proteína por día
-    - grasas_g: gramos de grasa por día
-    - carbos_g: gramos de carbohidratos por día
-    - dietas_posibles: lista de tipos de dieta sugeridos
-    """
+@st.cache_resource
+def cargar_modelos():
+    gdown.download(
+        "https://drive.google.com/uc?id=10UuMfA8z1KukoWDPvDUdnFCn_xonQwew",
+        "files/df_recetas.pkl", quiet=True)
+    with open("files/df_recetas.pkl", "rb") as f:
+        df = pickle.load(f)
 
-    # -----------------------------
-    # MASA MAGRA
-    # -----------------------------
-    # Masa libre de grasa: peso total * (1 - % de grasa)
-    masa_magra = peso * (1 - pct_grasa / 100)
+    with open("files/scaler.pkl", "rb") as f:
+        scaler = pickle.load(f)
 
-    # -----------------------------
-    # BMR: TASA METABÓLICA BASAL
-    # -----------------------------
-    # BMR (Basal Metabolic Rate) = calorías que quemas en reposo
-    if sexo.lower() == "hombre":
-        bmr = 10 * peso + 6.25 * altura - 5 * edad + 5
-    else:  # mujer
-        bmr = 10 * peso + 6.25 * altura - 5 * edad - 161
+    with open("files/knn.pkl", "rb") as f:
+        knn = pickle.load(f)
 
-    # -----------------------------
-    # FACTOR DE ACTIVIDAD
-    # -----------------------------
-    # TDEE = Total Daily Energy Expenditure (gasto calórico total)
-    factores = {
-        "sedentario": 1.2,      # poca actividad
-        "ligero": 1.375,        # ejercicio ligero 1-3 días/semana
-        "moderado": 1.55,       # ejercicio moderado 3-5 días/semana
-        "alto": 1.725,          # entrenamiento intenso 6-7 días/semana
-        "muy_alto": 1.9         # trabajo físico intenso o doble entrenamiento
-    }
-    factor_act = factores.get(actividad.lower(), 1.55)  # 1.55 por defecto si no se reconoce
+    return df, scaler, knn
 
-    # -----------------------------
-    # TDEE: CALORÍAS DIARIAS
-    # -----------------------------
-    # TDEE = calorías necesarias para mantener peso con tu nivel de actividad
-    tdee = bmr * factor_act
 
-    # -----------------------------
-    # AJUSTE SEGÚN OBJETIVO
-    # -----------------------------
-    if objetivo == "ganar_musculo":
-        # Superávit calórico leve: 10% + 150 kcal extra para favorecer crecimiento muscular
-        calorias = tdee * 1.10 + 150
-        # Proteína alta: 2.2 g por kg de masa magra para preservar y ganar músculo
-        proteina = round(masa_magra * 2.2)
-        # Grasas = 25% de las calorías totales (1 g grasa = 9 kcal)
-        grasas = round((calorias * 0.25) / 9)
-    elif objetivo == "perder_peso":
-        # Déficit calórico del 20%, mínimo 1200 kcal/día para seguridad
-        calorias = max(tdee * 0.80, 1200)
-        # Proteína alta para preservar músculo en déficit
-        proteina = round(masa_magra * 2.2)
-        # Grasas = 25% de las calorías totales
-        grasas = round((calorias * 0.25) / 9)
-    else:  # recomposición (mantener peso y mejorar composición corporal)
-        calorias = tdee
-        proteina = round(masa_magra * 2.0)  # proteína moderada
-        grasas = round((calorias * 0.25) / 9)  # 25% calorías en grasa
+df_recetas, scaler, knn = cargar_modelos()
 
-    # -----------------------------
-    # CARBOHIDRATOS
-    # -----------------------------
-    # Carbohidratos = resto de calorías
-    carbos = round((calorias - (proteina * 4 + grasas * 9)) / 4)
-
-    # -----------------------------
-    # LISTA DE DIETAS POSIBLES
-    # -----------------------------
-    # Se sugiere un rango de dietas según objetivo y % de grasa corporal
-    if objetivo == "ganar_musculo":
-        dietas_posibles = ["alta en proteína", "balanceada", "mediterránea"]
-    elif objetivo == "perder_peso":
-        if pct_grasa > 25:
-            dietas_posibles = ["low-carb", "keto", "paleo"]
-        else:
-            dietas_posibles = ["balanceada", "mediterránea", "flexitariana"]
-    else:  # recomposición
-        dietas_posibles = ["balanceada", "mediterránea", "flexitariana", "alta en proteína"]
-
-    # -----------------------------
-    # RETORNO
-    # -----------------------------
-    return {
-        "calorias": round(calorias),      # kcal/día
-        "proteina_g": proteina,           # g/día
-        "grasas_g": grasas,               # g/día
-        "carbos_g": carbos,               # g/día
-        "dietas_posibles": dietas_posibles
-    }
-
-def estimar_pct_grasa(sexo, categoria):
-    if sexo.lower() == "hombre":
-        mapa = {
-            "Delgado": 12,
-            "Normal": 18,
-            "Relleno": 25,
-            "Obeso": 32
-        }
-    else:
-        mapa = {
-            "Delgado": 20,
-            "Normal": 26,
-            "Relleno": 33,
-            "Obeso": 40
-        }
-
-    return mapa.get(categoria, 18)
-
-TODAS_LAS_DIETAS = [
-    "alta en proteína",
-    "balanceada",
-    "mediterránea",
-    "low-carb",
-    "keto",
-    "paleo",
-    "flexitariana",
-    "vegetariana",
-    "vegana",
-    "sin gluten",
-    "halal"
+FEATURES = [
+    "calorias", "proteina", "grasa", "carbos",
 ]
 
-# Aqui comienza la aplicación Streamlit
+def recomendar_recetas(macros_obj, dietas, n=3):
+    subset = df_recetas[df_recetas["dieta"].isin(dietas)]
 
-if "calculado" not in st.session_state:
-    st.session_state.calculado = False
+    if subset.empty:
+        return pd.DataFrame()
 
-if "dietas_seleccionadas" not in st.session_state:
-    st.session_state.dietas_seleccionadas = []
+    user_vec = scaler.transform([[
+        macros_obj["calorias"],
+        macros_obj["proteina"],
+        macros_obj["grasa"],
+        macros_obj["carbos"]
+    ]])
 
-if "resultado" not in st.session_state:
-    st.session_state.resultado = None
+    X_subset = scaler.transform(subset[FEATURES])
 
-if "pct_grasa_usado" not in st.session_state:
-    st.session_state.pct_grasa_usado = None
+    distances, idxs = knn.kneighbors(
+        user_vec,
+        n_neighbors=min(n, len(X_subset))
+    )
 
+    return subset.iloc[idxs[0]]
 
-st.set_page_config(page_title="SmartEatAI", layout="centered")
-st.title("SmartEatAI - Cálculo de Macros")
+def cambiar_por_similar(receta_id, dietas):
+    idx = df_recetas[df_recetas["id"] == receta_id].index[0]
 
-st.write("Introduce tus datos físicos y tu objetivo. Calcularemos tus macros diarios de forma personalizada.")
+    X_rec = scaler.transform([df_recetas.loc[idx, FEATURES]])
 
-col1, col2 = st.columns(2)
+    distances, idxs = knn.kneighbors(X_rec, n_neighbors=8)
 
-with col1:
-    sexo = st.selectbox("Sexo", ["Hombre", "Mujer"], key="sexo")
-    edad = st.number_input("Edad (años)", min_value=10, max_value=100, value=28, key="edad")
-    altura = st.number_input("Altura (cm)", min_value=120, max_value=230, value=175, key="altura")
+    for i in idxs[0][1:]:
+        r = df_recetas.iloc[i]
+        if r["dieta"] in dietas:
+            return r
+
+    return None
+
+def estimar_pct_grasa(sexo, categoria):
+    if sexo == "Hombre":
+        return {"Delgado": 12, "Normal": 18, "Relleno": 25, "Obeso": 32}[categoria]
+    else:
+        return {"Delgado": 20, "Normal": 26, "Relleno": 33, "Obeso": 40}[categoria]
+
+def calcular_macros(sexo, edad, altura, peso, pct_grasa, actividad, objetivo):
+    masa_magra = peso * (1 - pct_grasa / 100)
+
+    if sexo == "Hombre":
+        bmr = 10 * peso + 6.25 * altura - 5 * edad + 5
+    else:
+        bmr = 10 * peso + 6.25 * altura - 5 * edad - 161
+
+    factores = {
+        "Sedentario": 1.2,
+        "Ligero": 1.375,
+        "Moderado": 1.55,
+        "Alto": 1.725,
+        "Muy alto": 1.9
+    }
+
+    tdee = bmr * factores[actividad]
+
+    if objetivo == "Ganar músculo":
+        calorias = tdee * 1.1 + 150
+        proteina = masa_magra * 2.2
+        dietas = ["alta en proteína", "balanceada"]
+    elif objetivo == "Perder peso":
+        calorias = tdee * 0.8
+        proteina = masa_magra * 2.2
+        dietas = ["low-carb", "keto"]
+    else:
+        calorias = tdee
+        proteina = masa_magra * 2.0
+        dietas = ["balanceada", "mediterránea"]
+
+    grasas = (calorias * 0.25) / 9
+    carbos = (calorias - (proteina * 4 + grasas * 9)) / 4
+
+    return {
+        "calorias": round(calorias),
+        "proteina": round(proteina),
+        "grasa": round(grasas),
+        "carbos": round(carbos),
+        "dietas": dietas
+    }
+
+st.set_page_config(
+    page_title="SmartEatAI",
+    layout="centered"
+)
+
+st.title("🥗 SmartEatAI")
+st.caption("Recomendador inteligente de comidas según tus macros")
+
+with st.form("form_usuario"):
+    sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
+    edad = st.number_input("Edad", 10, 100, 28)
+    altura = st.number_input("Altura (cm)", 140, 220, 175)
+    peso = st.number_input("Peso (kg)", 40.0, 200.0, 75.0)
     actividad = st.selectbox(
         "Nivel de actividad",
-        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy_alto"],
-        key="actividad"
+        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy alto"]
     )
-
-with col2:
-    peso = st.number_input("Peso (kg)", min_value=30.0, max_value=250.0, value=70.0, key="peso")
-
-    modo_grasa = st.radio(
-        "¿Cómo quieres indicar tu grasa corporal?",
-        ["Seleccionar tipo de cuerpo", "Introducir % exacto"],
-        key="modo_grasa"
-    )
-
-    if modo_grasa == "Seleccionar tipo de cuerpo":
-        categoria_grasa = st.selectbox(
-            "Tipo de cuerpo",
-            ["Delgado", "Normal", "Relleno", "Obeso"],
-            key="categoria_grasa"
-        )
-        pct_grasa_input = None
-    else:
-        pct_grasa_input = st.number_input(
-            "Porcentaje de grasa corporal (%)",
-            min_value=5.0,
-            max_value=60.0,
-            value=18.0,
-            key="pct_grasa_input"
-        )
-        categoria_grasa = None
-
     objetivo = st.selectbox(
         "Objetivo",
-        ["ganar_musculo", "perder_peso", "recomposición"],
-        key="objetivo"
+        ["Ganar músculo", "Perder peso", "Mantenimiento"]
+    )
+    cuerpo = st.selectbox(
+        "Tipo de cuerpo",
+        ["Delgado", "Normal", "Relleno", "Obeso"]
     )
 
-if st.button("Calcular macros"):
-    if modo_grasa == "Seleccionar tipo de cuerpo":
-        pct_grasa = estimar_pct_grasa(sexo, categoria_grasa)
-    else:
-        pct_grasa = pct_grasa_input
+    submit = st.form_submit_button("Calcular y recomendar")
 
-    resultado = calcular_macros_objetivo(
-        sexo=sexo,
-        edad=edad,
-        altura=altura,
-        peso=peso,
-        pct_grasa=pct_grasa,
-        actividad=actividad,
-        objetivo=objetivo
+if submit:
+    pct = estimar_pct_grasa(sexo, cuerpo)
+
+    macros = calcular_macros(
+        sexo, edad, altura, peso, pct, actividad, objetivo
     )
 
-    st.session_state.resultado = resultado
-    st.session_state.pct_grasa_usado = pct_grasa
-    st.session_state.calculado = True
-
-    # Resetear selección a recomendadas
-    st.session_state.dietas_seleccionadas = resultado["dietas_posibles"]
-
-
-if st.session_state.calculado and st.session_state.resultado:
-
-    resultado = st.session_state.resultado
-    pct_grasa = st.session_state.pct_grasa_usado
-
-    st.subheader("Resultados personalizados")
-
-    colA, colB = st.columns(2)
-
-    with colA:
-        st.metric("Calorías (kcal/día)", resultado["calorias"])
-        st.metric("Proteína (g/día)", resultado["proteina_g"])
-
-    with colB:
-        st.metric("Grasas (g/día)", resultado["grasas_g"])
-        st.metric("Carbohidratos (g/día)", resultado["carbos_g"])
-
-    st.caption(f"Porcentaje de grasa usado en el cálculo: {round(pct_grasa, 1)}%")
-
-    st.subheader("Opciones de dieta")
-
-    dietas_recomendadas = resultado["dietas_posibles"]
-
-    opciones_ui = []
-    for dieta in TODAS_LAS_DIETAS:
-        if dieta in dietas_recomendadas:
-            opciones_ui.append(f"{dieta}  [RECOMENDADA]")
-        else:
-            opciones_ui.append(dieta)
-
-    if st.session_state.dietas_seleccionadas:
-        default_ui = [
-            f"{d}  [RECOMENDADA]" if d in dietas_recomendadas else d
-            for d in st.session_state.dietas_seleccionadas
-        ]
-    else:
-        default_ui = [
-            f"{dieta}  [RECOMENDADA]"
-            for dieta in dietas_recomendadas
-        ]
-
-    seleccion_ui = st.multiselect(
-        "Elige una o varias dietas según tus preferencias",
-        opciones_ui,
-        default=default_ui,
-        key="dietas_ui"
+    st.session_state.macros = macros
+    st.session_state.recetas = recomendar_recetas(
+        {
+            "calorias": macros["calorias"] / 3,
+            "proteina": macros["proteina"] / 3,
+            "grasa": macros["grasa"] / 3,
+            "carbos": macros["carbos"] / 3
+        },
+        macros["dietas"],
+        n=3
     )
 
-    # Limpiar selección
-    dietas_seleccionadas = [
-        d.replace("  [RECOMENDADA]", "")
-        for d in seleccion_ui
-    ]
+if "macros" in st.session_state:
+    st.subheader("📊 Macros diarios")
+    st.json(st.session_state.macros)
 
-    # GUARDAR ESTADO AQUÍ (no fuera)
-    st.session_state.dietas_seleccionadas = dietas_seleccionadas
+if "recetas" in st.session_state:
+    st.subheader("🍽️ Comidas recomendadas")
+
+    for i, receta in st.session_state.recetas.iterrows():
+        st.markdown(f"### {receta['name']}")
+        st.write("**Dieta:**", receta["dieta"])
+        st.write("**Ingredientes:**")
+        st.write(receta["ingredientes"])
+
+        if st.button("Cambiar por similar", key=f"swap_{receta['id']}"):
+            nueva = cambiar_por_similar(
+                receta["id"],
+                st.session_state.macros["dietas"]
+            )
+            if nueva is not None:
+                st.success(f"Alternativa: {nueva['name']}")
+                st.write(nueva["ingredientes"])
