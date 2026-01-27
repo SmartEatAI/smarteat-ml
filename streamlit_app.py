@@ -1,5 +1,6 @@
 import streamlit as st
 import pickle
+import ast
 import pandas as pd
 import numpy as np
 import gdown
@@ -163,13 +164,14 @@ if "recetas" in st.session_state:
     st.subheader("🍽️ Comidas recomendadas")
 
     for i, receta in st.session_state.recetas.iterrows():
+        nutrition = ast.literal_eval(receta["nutrition"])
+
         st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
-        st.write(f"- {float(receta['nutrition'][0])} kcal")
-        # st.write(f"- Calorías: {float(receta['nutrition'][0])}")
-        # st.write(f"- Proteína: {float(receta['nutrition'][4])} g")
-        # st.write(f"- Grasa: {float(receta['nutrition'][1])} g")
-        # st.write(f"- Carbohidratos: {float(receta['nutrition'][6])} g")
+        st.write(f"- Calorías: {float(nutrition[0])} kcal")
+        st.write(f"- Proteína: {float(nutrition[4])} g")
+        st.write(f"- Grasa: {float(nutrition[1])} g")
+        st.write(f"- Carbohidratos: {float(nutrition[6])} g")
         st.write("**Ingredientes:**")
         st.write(receta["ingredientes"])
 
@@ -178,12 +180,13 @@ if "recetas" in st.session_state:
                 receta["id"]
             )
             if nueva is not None:
+                nutrition = ast.literal_eval(nueva["nutrition"])
                 st.success(f"Alternativa: {nueva['name']}")
                 st.write(f"{nueva}")
                 st.write("**Macros:**")
-                st.write(f"- Calorías: {float(nueva['nutrition'][0])}")
-                st.write(f"- Proteína: {float(nueva['nutrition'][4])} g")
-                st.write(f"- Grasa: {float(nueva['nutrition'][1])} g")
-                st.write(f"- Carbohidratos: {float(nueva['nutrition'][6])} g")
+                st.write(f"- Calorías: {float(nutrition[0])} kcal")
+                st.write(f"- Proteína: {float(nutrition[4])} g")
+                st.write(f"- Grasa: {float(nutrition[1])} g")
+                st.write(f"- Carbohidratos: {float(nutrition[6])} g")
 
                 st.write(nueva["ingredientes"])
