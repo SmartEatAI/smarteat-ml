@@ -164,14 +164,12 @@ if "recetas" in st.session_state:
 
     for i, receta in st.session_state.recetas.iterrows():
         st.markdown(f"### {receta['name']}")
-        st.write("**Dieta:**", receta["dieta"])
         st.write("**Ingredientes:**")
         st.write(receta["ingredientes"])
 
         if st.button("Cambiar por similar", key=f"swap_{receta['id']}"):
             nueva = cambiar_por_similar(
-                receta["id"],
-                st.session_state.macros["dietas"]
+                receta["id"]
             )
             if nueva is not None:
                 st.success(f"Alternativa: {nueva['name']}")
