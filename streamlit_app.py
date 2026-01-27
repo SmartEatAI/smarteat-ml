@@ -151,9 +151,9 @@ if submit:
             "grasa": macros["grasa"] / 3,
             "carbos": macros["carbos"] / 3
         },
-        macros["dietas"],
         n=3
     )
+
 
 if "macros" in st.session_state:
     st.subheader("📊 Macros diarios")
