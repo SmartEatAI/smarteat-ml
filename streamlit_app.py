@@ -18,16 +18,19 @@ def cargar_modelos():
 df_recetas, scaler, knn = cargar_modelos()
 
 FEATURES = [
-    "calorias", "proteina", "grasa", "carbos",
+    "Calories",
+    "FatContent",
+    "CarbohydrateContent",
+    "ProteinContent"
 ]
 
 def recomendar_recetas(macros_obj, n=3):
 
     user_vec = scaler.transform([[
-        macros_obj["calorias"],
-        macros_obj["proteina"],
-        macros_obj["grasa"],
-        macros_obj["carbos"]
+        macros_obj["Calories"],
+        macros_obj["ProteinContent"],
+        macros_obj["FatContent"],
+        macros_obj["CarbohydrateContent"]
     ]])
 
     X_scaled = scaler.transform(df_recetas[FEATURES])
@@ -140,10 +143,10 @@ if submit:
     st.session_state.macros = macros
     st.session_state.recetas = recomendar_recetas(
         {
-            "calorias": macros["calorias"] / 3,
-            "proteina": macros["proteina"] / 3,
-            "grasa": macros["grasa"] / 3,
-            "carbos": macros["carbos"] / 3
+            "Calories": macros["calorias"] / 3,
+            "ProteinContent": macros["proteina"] / 3,
+            "FatContent": macros["grasa"] / 3,
+            "CarbohydrateContent": macros["carbos"] / 3
         },
         n=3
     )
@@ -157,14 +160,12 @@ if "recetas" in st.session_state:
     st.subheader("🍽️ Comidas recomendadas")
 
     for i, receta in st.session_state.recetas.iterrows():
-        nutrition = ast.literal_eval(receta["nutrition"])
-
         st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
-        st.write(f"- Calorías: {float(nutrition[0])} kcal")
-        st.write(f"- Proteína: {float(nutrition[4])} g")
-        st.write(f"- Grasa: {float(nutrition[1])} g")
-        st.write(f"- Carbohidratos: {float(nutrition[6])} g")
+        st.write(f"- Calorías: {receta['Calories']} kcal")
+        st.write(f"- Proteína: {receta['ProteinContent']} g")
+        st.write(f"- Grasa: {receta['FatContent']} g")
+        st.write(f"- Carbohidratos: {receta['CarbohydrateContent']} g")
         st.write("**Ingredientes:**")
         st.write(receta["ingredientes"])
 
@@ -173,12 +174,11 @@ if "recetas" in st.session_state:
                 receta["id"]
             )
             if nueva is not None:
-                nutrition = ast.literal_eval(nueva["nutrition"])
                 st.success(f"Alternativa: {nueva['name']}")
                 st.write("**Macros:**")
-                st.write(f"- Calorías: {float(nutrition[0])} kcal")
-                st.write(f"- Proteína: {float(nutrition[4])} g")
-                st.write(f"- Grasa: {float(nutrition[1])} g")
-                st.write(f"- Carbohidratos: {float(nutrition[6])} g")
+                st.write(f"- Calorías: {nueva['Calories']} kcal")
+                st.write(f"- Proteína: {nueva['ProteinContent']} g")
+                st.write(f"- Grasa: {nueva['FatContent']} g")
+                st.write(f"- Carbohidratos: {nueva['CarbohydrateContent']} g")
 
                 st.write(nueva["ingredientes"])
