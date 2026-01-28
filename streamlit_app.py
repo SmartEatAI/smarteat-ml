@@ -27,7 +27,7 @@ FEATURES = [
     'protein_content'
 ]
 
-def recomendar_recetas(macros_obj, n=3):
+def recomendar_recetas(macros_obj, n=33):
 
     user_vec = scaler.transform([[
         macros_obj["calories"],
