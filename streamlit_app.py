@@ -27,10 +27,10 @@ FEATURES = [
 def recomendar_recetas(macros_obj, n=3):
 
     user_vec = scaler.transform([[
-        macros_obj["Calories"],
-        macros_obj["ProteinContent"],
-        macros_obj["FatContent"],
-        macros_obj["CarbohydrateContent"]
+        macros_obj["calories"],
+        macros_obj["protein_content"],
+        macros_obj["fat_content"],
+        macros_obj["carbohydrate_content"]
     ]])
 
     X_scaled = scaler.transform(df_recetas[FEATURES])
@@ -143,10 +143,10 @@ if submit:
     st.session_state.macros = macros
     st.session_state.recetas = recomendar_recetas(
         {
-            "Calories": macros["calorias"] / 3,
-            "ProteinContent": macros["proteina"] / 3,
-            "FatContent": macros["grasa"] / 3,
-            "CarbohydrateContent": macros["carbos"] / 3
+            "calories": macros["calorias"] / 3,
+            "protein_content": macros["proteina"] / 3,
+            "fat_content": macros["grasa"] / 3,
+            "carbohydrate_content": macros["carbos"] / 3
         },
         n=3
     )
@@ -162,10 +162,10 @@ if "recetas" in st.session_state:
     for i, receta in st.session_state.recetas.iterrows():
         st.markdown(f"### {receta['Name']}")
         st.write("**Macros:**")
-        st.write(f"- Calorías: {receta['Calories']} kcal")
-        st.write(f"- Proteína: {receta['ProteinContent']} g")
+        st.write(f"- Calorías: {receta['calories']} kcal")
+        st.write(f"- Proteína: {receta['protein_content']} g")
         st.write(f"- Grasa: {receta['FatContent']} g")
-        st.write(f"- Carbohidratos: {receta['CarbohydrateContent']} g")
+        st.write(f"- Carbohidratos: {receta['carbohydrate_content']} g")
         st.write("**Ingredientes:**")
         st.write(receta['RecipeIngredientParts'])
 
@@ -176,9 +176,9 @@ if "recetas" in st.session_state:
             if nueva is not None:
                 st.success(f"Alternativa: {nueva['Name']}")
                 st.write("**Macros:**")
-                st.write(f"- Calorías: {nueva['Calories']} kcal")
-                st.write(f"- Proteína: {nueva['ProteinContent']} g")
-                st.write(f"- Grasa: {nueva['FatContent']} g")
-                st.write(f"- Carbohidratos: {nueva['CarbohydrateContent']} g")
+                st.write(f"- Calorías: {nueva['calories']} kcal")
+                st.write(f"- Proteína: {nueva['protein_content']} g")
+                st.write(f"- Grasa: {nueva['fat_content']} g")
+                st.write(f"- Carbohidratos: {nueva['carbohydrate_content']} g")
 
                 st.write(nueva['RecipeIngredientParts'])
