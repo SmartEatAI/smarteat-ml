@@ -18,10 +18,10 @@ def cargar_modelos():
 df_recetas, scaler, knn = cargar_modelos()
 
 FEATURES = [
-    "Calories",
-    "FatContent",
-    "CarbohydrateContent",
-    "ProteinContent"
+    'calories',
+    'fat_content',
+    'carbohydrate_content',
+    'protein_content'
 ]
 
 def recomendar_recetas(macros_obj, n=3):
