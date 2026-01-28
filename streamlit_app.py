@@ -162,24 +162,35 @@ if "macros" in st.session_state:
     if "recetas" in st.session_state:
         recetas_df = st.session_state.recetas
         total_protein = recetas_df["protein_content"].sum()
-        # Fat can be 'fat_content' or 'FatContent'
         if "fat_content" in recetas_df.columns:
             total_fat = recetas_df["fat_content"].sum()
         elif "FatContent" in recetas_df.columns:
             total_fat = recetas_df["FatContent"].sum()
         total_cal = recetas_df["calories"].sum()
         total_carb = recetas_df["carbohydrate_content"].sum()
-    # Progress bars
+
     st.write("**Progreso de macros de las comidas recomendadas:**")
     def macro_bar(label, value, total, color):
         pct = min(1.0, value / total) if total > 0 else 0
         bar_html = f'''<div style="margin-bottom:8px"><b>{label}:</b> {value:.0f} / {total:.0f} <div style='background:#eee;width:100%;height:18px;border-radius:8px;overflow:hidden'><div style='width:{pct*100:.1f}%;height:100%;background:{color};'></div></div></div>'''
         st.markdown(bar_html, unsafe_allow_html=True)
-    macro_bar("Proteína", total_protein, macros["proteina"], "#e74c3c")  # rojo
-    macro_bar("Grasa", total_fat, macros["grasa"], "#27ae60")  # verde
-    macro_bar("Calorías", total_cal, macros["calorias"], "#f39c12")  # naranja
-    macro_bar("Carbohidratos", total_carb, macros["carbos"], "#2980b9")  # azul
-    st.json(macros)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        macro_bar("Calorías", total_cal, macros["calorias"], "#f39c12")  # naranja
+        macro_bar("Grasa", total_fat, macros["grasa"], "#27ae60")  # verde
+    with col2:
+        macro_bar("Proteína", total_protein, macros["proteina"], "#e74c3c")  # rojo
+        macro_bar("Carbohidratos", total_carb, macros["carbos"], "#2980b9")  # azul
+
+    if "dietas" in macros and macros["dietas"]:
+        st.write("**Tipos de dieta sugeridos:**")
+        label_colors = ["#8e44ad", "#16a085", "#c0392b", "#2980b9", "#f39c12", "#27ae60"]
+        labels_html = ""
+        for i, dieta in enumerate(macros["dietas"]):
+            color = label_colors[i % len(label_colors)]
+            labels_html += f"<span style='display:inline-block;background:{color};color:#fff;padding:4px 12px;border-radius:12px;margin-right:8px;margin-bottom:4px;font-size:14px'>{dieta}</span>"
+        st.markdown(labels_html, unsafe_allow_html=True)
 
 if "recetas" in st.session_state:
     st.subheader("🍽️ Comidas recomendadas")
@@ -201,7 +212,6 @@ if "recetas" in st.session_state:
                 st.session_state.recetas.loc[idx] = nueva
                 st.session_state._rerun = True
 
-# Rerun if a swap was made
 if st.session_state.get('_rerun', False):
     st.session_state._rerun = False
     st.rerun()
