@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import gdown
 from joblib import load
+from streamlit_carousel_uui import uui_carousel
 
 @st.cache_resource
 def cargar_modelos():
@@ -205,7 +206,16 @@ if "recetas" in st.session_state:
 
     recetas_df = st.session_state.recetas.copy()
     for idx, receta in recetas_df.iterrows():
-        st.image(receta['images'], width=300)
+        imagenes = receta['images'].split(", ")
+        slides = [
+            {
+                "image": url,
+                "title": receta['name'],
+                "description": ""
+            }
+            for url in imagenes
+        ]
+        uui_carousel(items=slides, variant="md")
         st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
         st.write(f"- Calorías: {receta['calories']} kcal")

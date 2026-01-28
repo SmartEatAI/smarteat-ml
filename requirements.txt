@@ -3,3 +3,4 @@ scikit-learn
 joblib
 numpy
 gdown
+streamlit_carousel_uui
