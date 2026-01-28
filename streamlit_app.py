@@ -203,6 +203,7 @@ if "recetas" in st.session_state:
 
     recetas_df = st.session_state.recetas.copy()
     for idx, receta in recetas_df.iterrows():
+        st.image(receta['images'], width=300)
         st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
         st.write(f"- Calorías: {receta['calories']} kcal")
