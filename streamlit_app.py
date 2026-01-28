@@ -154,31 +154,51 @@ if submit:
 
 if "macros" in st.session_state:
     st.subheader("📊 Macros diarios")
-    st.json(st.session_state.macros)
+    macros = st.session_state.macros
+    # If recipes are recommended, show progress bars for each macro
+    total_protein = 0
+    total_fat = 0
+    total_cal = 0
+    total_carb = 0
+    if "recetas" in st.session_state:
+        recetas_df = st.session_state.recetas
+        total_protein = recetas_df["protein_content"].sum()
+        # Fat can be 'fat_content' or 'FatContent'
+        if "fat_content" in recetas_df.columns:
+            total_fat = recetas_df["fat_content"].sum()
+        elif "FatContent" in recetas_df.columns:
+            total_fat = recetas_df["FatContent"].sum()
+        total_cal = recetas_df["calories"].sum()
+        total_carb = recetas_df["carbohydrate_content"].sum()
+    # Progress bars
+    st.write("**Progreso de macros de las comidas recomendadas:**")
+    def macro_bar(label, value, total, color):
+        pct = min(1.0, value / total) if total > 0 else 0
+        bar_html = f'''<div style="margin-bottom:8px"><b>{label}:</b> {value:.0f} / {total:.0f} <div style='background:#eee;width:100%;height:18px;border-radius:8px;overflow:hidden'><div style='width:{pct*100:.1f}%;height:100%;background:{color};'></div></div></div>'''
+        st.markdown(bar_html, unsafe_allow_html=True)
+    macro_bar("Proteína", total_protein, macros["proteina"], "#e74c3c")  # rojo
+    macro_bar("Grasa", total_fat, macros["grasa"], "#27ae60")  # verde
+    macro_bar("Calorías", total_cal, macros["calorias"], "#f39c12")  # naranja
+    macro_bar("Carbohidratos", total_carb, macros["carbos"], "#2980b9")  # azul
+    st.json(macros)
 
 if "recetas" in st.session_state:
     st.subheader("🍽️ Comidas recomendadas")
 
-    for i, receta in st.session_state.recetas.iterrows():
+    recetas_df = st.session_state.recetas.copy()
+    for idx, receta in recetas_df.iterrows():
         st.markdown(f"### {receta['Name']}")
         st.write("**Macros:**")
         st.write(f"- Calorías: {receta['calories']} kcal")
         st.write(f"- Proteína: {receta['protein_content']} g")
-        st.write(f"- Grasa: {receta['FatContent']} g")
+        st.write(f"- Grasa: {receta.get('fat_content', receta.get('FatContent', 0))} g")
         st.write(f"- Carbohidratos: {receta['carbohydrate_content']} g")
         st.write("**Ingredientes:**")
         st.write(receta['RecipeIngredientParts'])
 
         if st.button("Cambiar por similar", key=f"swap_{receta['id']}"):
-            nueva = cambiar_por_similar(
-                receta["id"]
-            )
+            nueva = cambiar_por_similar(receta["id"])
             if nueva is not None:
-                st.success(f"Alternativa: {nueva['Name']}")
-                st.write("**Macros:**")
-                st.write(f"- Calorías: {nueva['calories']} kcal")
-                st.write(f"- Proteína: {nueva['protein_content']} g")
-                st.write(f"- Grasa: {nueva['fat_content']} g")
-                st.write(f"- Carbohidratos: {nueva['carbohydrate_content']} g")
-
-                st.write(nueva['RecipeIngredientParts'])
+                # Replace the recipe in the DataFrame
+                st.session_state.recetas.iloc[idx] = nueva
+                st.experimental_rerun()
