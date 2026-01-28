@@ -157,6 +157,8 @@ if submit:
         n=3
     )
 
+    st.balloons()
+
 
 if "macros" in st.session_state:
     st.subheader("📊 Macros diarios")
@@ -214,6 +216,7 @@ if "recetas" in st.session_state:
         st.write(receta['recipe_ingredient_parts'])
 
         if st.button("Cambiar por similar", key=f"swap_{receta['id']}_{idx}"):
+            st.balloons()
             nueva = cambiar_por_similar(receta["id"])
             if nueva is not None:
                 st.session_state.recetas.loc[idx] = nueva
