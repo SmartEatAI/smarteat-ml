@@ -199,4 +199,9 @@ if "recetas" in st.session_state:
             nueva = cambiar_por_similar(receta["id"])
             if nueva is not None:
                 st.session_state.recetas.loc[idx] = nueva
-                st.experimental_rerun()
+                st.session_state._rerun = True
+
+# Rerun if a swap was made
+if st.session_state.get('_rerun', False):
+    st.session_state._rerun = False
+    st.rerun()
