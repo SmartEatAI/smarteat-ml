@@ -195,7 +195,7 @@ if "recetas" in st.session_state:
         st.write("**Ingredientes:**")
         st.write(receta['recipe_ingredient_parts'])
 
-        if st.button("Cambiar por similar", key=f"swap_{receta['id']}"):
+        if st.button("Cambiar por similar", key=f"swap_{receta['id']}_{idx}"):
             nueva = cambiar_por_similar(receta["id"])
             if nueva is not None:
                 st.session_state.recetas.loc[idx] = nueva
