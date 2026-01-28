@@ -215,7 +215,7 @@ if "recetas" in st.session_state:
             }
             for url in imagenes
         ]
-        uui_carousel(items=slides, variant="md")
+        uui_carousel(items=slides, variant="md", key=f"carousel_{idx}")
         st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
         st.write(f"- Calorías: {receta['calories']} kcal")
