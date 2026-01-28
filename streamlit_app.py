@@ -155,7 +155,6 @@ if submit:
 if "macros" in st.session_state:
     st.subheader("📊 Macros diarios")
     macros = st.session_state.macros
-    # If recipes are recommended, show progress bars for each macro
     total_protein = 0
     total_fat = 0
     total_cal = 0
@@ -187,7 +186,7 @@ if "recetas" in st.session_state:
 
     recetas_df = st.session_state.recetas.copy()
     for idx, receta in recetas_df.iterrows():
-        st.markdown(f"### {receta['Name']}")
+        st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
         st.write(f"- Calorías: {receta['calories']} kcal")
         st.write(f"- Proteína: {receta['protein_content']} g")
@@ -199,6 +198,5 @@ if "recetas" in st.session_state:
         if st.button("Cambiar por similar", key=f"swap_{receta['id']}"):
             nueva = cambiar_por_similar(receta["id"])
             if nueva is not None:
-                # Replace the recipe in the DataFrame
                 st.session_state.recetas.iloc[idx] = nueva
                 st.experimental_rerun()
