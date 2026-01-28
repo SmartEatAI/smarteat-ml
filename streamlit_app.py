@@ -17,6 +17,8 @@ def cargar_modelos():
 
 df_recetas, scaler, knn = cargar_modelos()
 
+st.dataframe(df_recetas)
+
 FEATURES = [
     'calories',
     'fat_content',
