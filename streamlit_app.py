@@ -198,5 +198,5 @@ if "recetas" in st.session_state:
         if st.button("Cambiar por similar", key=f"swap_{receta['id']}"):
             nueva = cambiar_por_similar(receta["id"])
             if nueva is not None:
-                st.session_state.recetas.iloc[idx] = nueva
+                st.session_state.recetas.loc[idx] = nueva
                 st.experimental_rerun()
