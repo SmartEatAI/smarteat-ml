@@ -114,23 +114,27 @@ st.title("🥗 SmartEatAI")
 st.caption("Recomendador inteligente de comidas según tus macros")
 
 with st.form("form_usuario"):
-    sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
-    edad = st.number_input("Edad", 10, 100, 28)
-    altura = st.number_input("Altura (cm)", 140, 220, 175)
-    peso = st.number_input("Peso (kg)", 40.0, 200.0, 75.0)
-    actividad = st.selectbox(
-        "Nivel de actividad",
-        ["Sedentario", "Ligero", "Moderado", "Alto", "Muy alto"]
-    )
-    objetivo = st.selectbox(
-        "Objetivo",
-        ["Ganar músculo", "Perder peso", "Mantenimiento"]
-    )
-    cuerpo = st.selectbox(
-        "Tipo de cuerpo",
-        ["Delgado", "Normal", "Relleno", "Obeso"]
-    )
+    form_col1, form_col2 = st.columns(2)
+    with form_col1:
+        sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
+        altura = st.number_input("Altura (cm)", 140, 220, 175)
+        actividad = st.selectbox(
+            "Nivel de actividad",
+            ["Sedentario", "Ligero", "Moderado", "Alto", "Muy alto"]
+        )
 
+    with form_col2:
+        edad = st.number_input("Edad", 10, 100, 28)
+        peso = st.number_input("Peso (kg)", 40.0, 200.0, 75.0)
+        cuerpo = st.selectbox(
+            "Tipo de cuerpo",
+            ["Delgado", "Normal", "Relleno", "Obeso"]
+        )
+
+    objetivo = st.selectbox(
+            "Objetivo",
+            ["Ganar músculo", "Perder peso", "Mantenimiento"]
+        )
     submit = st.form_submit_button("Calcular y recomendar")
 
 if submit:
