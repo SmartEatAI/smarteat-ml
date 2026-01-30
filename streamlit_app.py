@@ -140,8 +140,9 @@ def safe_to_list(value):
 # RECOMMENDATION LOGIC
 # --------------------------------------------------
 def recommend_recipes(macros, diets, n):
-    user_vec = np.array([[macros[c] for c in FEATURES]])
-    user_scaled = scaler.transform(user_vec) * MACRO_WEIGHTS
+    user_df = pd.DataFrame([macros], columns=FEATURES)
+
+    user_scaled = scaler.transform(user_df).values * MACRO_WEIGHTS
     X_weighted = X_scaled_all * MACRO_WEIGHTS
 
     if diets:
@@ -165,8 +166,8 @@ def swap_similar_unique(recipe_id, used_ids, max_candidates=30):
 
     idx = idx_list[0]
 
-    # ⚠️ aplicar los mismos pesos que usas en recommend
-    vec = (X_scaled_all[idx] * MACRO_WEIGHTS).reshape(1, -1)
+    vec_df = df_recetas.loc[[idx], FEATURES]
+    vec = scaler.transform(vec_df).values * MACRO_WEIGHTS
 
     _, indices = knn.kneighbors(vec, n_neighbors=max_candidates)
 
