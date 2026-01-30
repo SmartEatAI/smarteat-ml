@@ -166,7 +166,7 @@ def swap_similar_unique(recipe_id, used_ids, max_candidates=30):
     idx = idx_list[0]
 
     vec_df = df_recetas.loc[[idx], FEATURES]
-    vec = scaler.transform(vec_df).values * MACRO_WEIGHTS
+    vec = scaler.transform(vec_df) * MACRO_WEIGHTS
 
     _, indices = knn.kneighbors(vec, n_neighbors=max_candidates)
 
