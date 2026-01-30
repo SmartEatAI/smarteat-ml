@@ -288,61 +288,94 @@ def card_container():
     return st.container(border=True)
 
 # --------------------------------------------------
-# DISPLAY RECIPES AS CARDS
+# DISPLAY RECIPES
 # --------------------------------------------------
 if "recipes" in st.session_state:
     st.header("🍽️ Recommended Meals")
 
-    for idx, recipe in st.session_state.recipes.iterrows():
+    df_rec = st.session_state.recipes
+
+    for idx, row in df_rec.iterrows():
         with st.container(border=True):
 
-            # --- Carousel ---
-            images = recipe["images"].split(", ")
-            slides = [{"image": img, "title": recipe["name"], "description": ""} for img in images]
-            uui_carousel(slides, variant="md", key=f"carousel_{idx}")
-
             # --- Title ---
-            st.markdown(f"### {recipe['name']}")
+            st.subheader(f"Meal {idx + 1}: {row['name']}")
 
-            # --- Meal type tags ---
-            meal_types = recipe["meal_type"]
-            if isinstance(meal_types, str):
-                meal_types = json.loads(meal_types)
+            c1, c2 = st.columns([1, 2])
 
-            html = ""
-            for mt in meal_types:
-                color = MEAL_COLORS.get(mt, "#34495e")
-                html += f"<span style='background:{color};color:white;padding:4px 12px;border-radius:12px;margin-right:6px;font-size:13px'>{mt}</span>"
-            st.markdown(html, unsafe_allow_html=True)
+            # -----------
+            # LEFT COLUMN
+            # -----------
+            with c1:
+                imgs = row["images"].split(", ")
+                slides = [
+                    {"image": url, "title": "", "description": ""}
+                    for url in imgs[:3]
+                ]
 
-            # --- Diet tags ---
-            render_diet_tags(recipe["diet_type"])
+                uui_carousel(
+                    items=slides,
+                    variant="sm",
+                    key=f"carousel_{row['id']}_{idx}"  # unique key
+                )
 
-            st.divider()
+            # ------------
+            # RIGHT COLUMN
+            # ------------
+            with c2:
+                # --- Meal type tags ---
+                meal_types = row.get("meal_type", [])
+                if isinstance(meal_types, str):
+                    meal_types = json.loads(meal_types)
 
-            # --- Macros ---
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write(f"**Calories:** {recipe['calories']} kcal")
-                st.write(f"**Protein:** {recipe['protein_content']} g")
-            with col2:
-                st.write(f"**Fat:** {recipe.get('fat_content', 0)} g")
-                st.write(f"**Carbs:** {recipe['carbohydrate_content']} g")
+                tags_html = ""
+                for mt in meal_types:
+                    color = MEAL_COLORS.get(mt, "#34495e")
+                    tags_html += (
+                        f"<span style='background:{color};color:white;"
+                        f"padding:4px 10px;border-radius:12px;"
+                        f"margin-right:6px;font-size:13px'>{mt}</span>"
+                    )
+                st.markdown(tags_html, unsafe_allow_html=True)
 
-            # --- Ingredients ---
-            st.write("**Ingredients:**")
-            ingredients = recipe["ingredients"]
-            if isinstance(ingredients, str):
-                ingredients = json.loads(ingredients)
-            for ing in ingredients:
-                st.write(f"• {ing}")
+                # --- Diet tags ---
+                render_diet_tags(row.get("diet_type", []))
 
-            st.divider()
+                st.write(
+                    f"**🔥 Calories:** {row['calories']} kcal  \n"
+                    f"**🥩 Protein:** {row['protein_content']} g | "
+                    f"**🥑 Fat:** {row.get('fat_content', 0)} g | "
+                    f"**🍞 Carbs:** {row['carbohydrate_content']} g"
+                )
 
-            # --- Swap button ---
-            if st.button("🔁 Swap for similar", key=f"swap_{recipe['id']}"):
-                used = get_used_recipe_ids()
-                new_recipe = swap_similar_unique(recipe["id"], used)
-                if new_recipe is not None:
-                    st.session_state.recipes.loc[idx] = new_recipe
-                    st.rerun()
+                # --- Ingredients ---
+                st.write("**Ingredients:**")
+                ingredients = row.get("recipe_ingredient_parts", [])
+                if isinstance(ingredients, str):
+                    ingredients = json.loads(ingredients)
+
+                for ing in ingredients:
+                    st.write(f"• {ing}")
+
+                # -----------
+                # SWAP BUTTON
+                # -----------
+                if st.button(
+                    "🔄 Swap for similar",
+                    key=f"btn_swp_{row['id']}_{idx}"
+                ):
+                    used_ids = get_used_recipe_ids()
+                    nueva = swap_similar_unique(row["id"], used_ids)
+
+                    if nueva is not None:
+                        df_temp = st.session_state.recipes.copy()
+
+                        # Align columns safely
+                        for col in df_temp.columns:
+                            if col not in nueva:
+                                nueva[col] = 0
+
+                        df_temp.iloc[idx] = nueva[df_temp.columns].values
+                        st.session_state.recipes = df_temp
+                        st.rerun()
+
