@@ -296,7 +296,7 @@ if submit:
 # --------------------------------------------------
 # DIET SELECTOR
 # --------------------------------------------------
-if "macros" in st.session_state:
+if "macros" in st.session_state and "recipes" not in st.session_state:
     macros = st.session_state.macros
     recommended = macros["recommended_diets"]
 
@@ -458,6 +458,7 @@ if "recipes" in st.session_state:
                 # -----------
                 if st.button("🔄 Swap for similar", key=f"btn_swp_{row['id']}_{idx}"):
                     used_ids = get_used_recipe_ids(exclude_id=row["id"])
+
                     nueva = swap_similar_unique(row["id"], used_ids)
 
                     if nueva is not None:
@@ -474,5 +475,3 @@ if "recipes" in st.session_state:
                         st.rerun()
                     else:
                         st.warning("No alternative recipes 😕")
-
-
