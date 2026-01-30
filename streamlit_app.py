@@ -1,265 +1,275 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import json
 from joblib import load
 from streamlit_carousel_uui import uui_carousel
 
-# --- CONFIGURACIÓN Y CARGA ---
-st.set_page_config(page_title="SmartEatAI")
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
+st.set_page_config(page_title="SmartEatAI", layout="wide")
 
+FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
+MACRO_WEIGHTS = np.array([1.5, 0.8, 1.0, 1.2])
+
+DIET_LABELS = {
+    "high_protein": "High Protein",
+    "low_carb": "Low Carb",
+    "vegan": "Vegan",
+    "vegetarian": "Vegetarian",
+    "low_calorie": "Low Calorie",
+    "high_fiber": "High Fiber"
+}
+
+MEAL_COLORS = {
+    "Breakfast": "#f39c12",
+    "Lunch": "#2980b9",
+    "Dinner": "#8e44ad",
+    "Snack": "#16a085"
+}
+
+# --------------------------------------------------
+# LOAD RESOURCES
+# --------------------------------------------------
 @st.cache_resource
-
-def cargar_recursos():
-    # Cargar archivos
+def load_resources():
     df = load("files/df_recetas.joblib")
     scaler = load("files/scaler.joblib")
     knn = load("files/knn.joblib")
-    
-    # Pre-escalar el dataset completo para evitar procesarlo en cada recomendación, para ahorrar CPU
-    FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
+
     X_scaled_all = scaler.transform(df[FEATURES])
-    
     return df, scaler, knn, X_scaled_all
 
-df_recetas, scaler, knn, X_scaled_all = cargar_recursos()
+df_recetas, scaler, knn, X_scaled_all = load_resources()
 
-FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
-MACRO_WEIGHTS = np.array([1.5, 0.8, 1.0, 1.2]) # Cal, Fat, Carb, Prot
+# --------------------------------------------------
+# UTILS
+# --------------------------------------------------
+def render_tags(tags, color="#34495e"):
+    html = ""
+    for tag in tags:
+        html += f"<span style='background:{color};color:white;padding:4px 10px;border-radius:12px;margin-right:6px;font-size:13px'>{tag}</span>"
+    st.markdown(html, unsafe_allow_html=True)
 
-# --- LÓGICA ---
+def render_diet_tags(diets):
+    html = ""
+    for d in diets:
+        label = DIET_LABELS.get(d, d)
+        html += f"<span style='background:#16a085;color:white;padding:4px 10px;border-radius:12px;margin-right:6px;font-size:13px'>{label}</span>"
+    st.markdown(html, unsafe_allow_html=True)
 
-def recomendar_recetas(macros_obj, n=3):
-    # Vector de usuario
-    user_vec = np.array([[
-        macros_obj["calories"],
-        macros_obj["fat_content"],
-        macros_obj["carbohydrate_content"],
-        macros_obj["protein_content"]
-    ]])
-    
-    # Escalar el vector de usuario
+def get_used_recipe_ids():
+    if "recipes" not in st.session_state:
+        return set()
+    return set(st.session_state.recipes["id"].tolist())
+
+# --------------------------------------------------
+# RECOMMENDATION LOGIC
+# --------------------------------------------------
+def recommend_recipes(macros, diets, n):
+    user_vec = np.array([[macros[c] for c in FEATURES]])
     user_scaled = scaler.transform(user_vec) * MACRO_WEIGHTS
     X_weighted = X_scaled_all * MACRO_WEIGHTS
-    
-    # Filtrado por dieta
-    dietas_usuario = macros_obj.get("dietas", [])
-    if dietas_usuario:
-        mask = df_recetas["diet_type"].str.contains("|".join(dietas_usuario), case=False, na=False)
-        indices_validos = np.where(mask)[0]
-        X_search = X_weighted[indices_validos]
-        df_search = df_recetas.iloc[indices_validos].copy()
+
+    if diets:
+        mask = df_recetas["diet_type"].str.contains("|".join(diets), case=False, na=False)
+        df_search = df_recetas[mask].copy()
+        X_search = X_weighted[mask.values]
     else:
-        X_search = X_weighted
         df_search = df_recetas.copy()
+        X_search = X_weighted
 
-    # Cálculo de distancia ##### REPASAR ESTO #####
-    distancias = np.linalg.norm(X_search - user_scaled, axis=1)
-    df_search["dist"] = distancias
-    
-    return df_search.sort_values("dist").head(n).reset_index(drop=True)
+    dist = np.linalg.norm(X_search - user_scaled, axis=1)
+    df_search["dist"] = dist
 
-def cambiar_por_similar(receta_id, n_busqueda=11):
-    # Localizar la receta actual en el DF global
-    idx_list = df_recetas.index[df_recetas["id"] == receta_id].tolist()
-    if not idx_list:
+    df_sorted = df_search.sort_values("dist")
+    return df_sorted.head(n).reset_index(drop=True)
+
+def swap_similar_unique(recipe_id, used_ids, max_tries=20):
+    idx = df_recetas.index[df_recetas["id"] == recipe_id].tolist()
+    if not idx:
         return None
-    
-    # Extraer el vector de características ya escalado (usando nuestra matriz precargada)
-    idx_global = idx_list[0]
-    vec_receta = X_scaled_all[idx_global].reshape(1, -1)
-    
-    # El modelo KNN ya está entrenado, lo usamos para buscar vecinos
-    dist, indices = knn.kneighbors(vec_receta, n_neighbors=n_busqueda)
-    
-    # Los resultados de kneighbors son índices del dataframe original
-    # Saltamos el primero (que es la misma receta) y elegimos uno al azar de los otros 9
-    idx_vecino = indices[0][np.random.randint(1, n_busqueda)]
-    
-    return df_recetas.iloc[idx_vecino].copy()
 
+    vec = X_scaled_all[idx[0]].reshape(1, -1)
+    _, indices = knn.kneighbors(vec, n_neighbors=25)
 
-# --- FUNCIONES DE CÁLCULO ---
-def estimar_pct_grasa(sexo, categoria):
+    for _ in range(max_tries):
+        candidate = df_recetas.iloc[np.random.choice(indices[0][1:])]
+        if candidate["id"] not in used_ids:
+            return candidate.copy()
+
+    return None
+
+# --------------------------------------------------
+# USER MACROS
+# --------------------------------------------------
+def estimate_bodyfat(sex, category):
     mapping = {
-        "Hombre": {"Delgado": 12, "Normal": 18, "Relleno": 25, "Obeso": 32},
-        "Mujer": {"Delgado": 20, "Normal": 26, "Relleno": 33, "Obeso": 40}
+        "Male": {"Lean": 12, "Normal": 18, "Stocky": 25, "Obese": 32},
+        "Female": {"Lean": 20, "Normal": 26, "Stocky": 33, "Obese": 40}
     }
-    return mapping[sexo][categoria]
+    return mapping[sex][category]
 
-# Funcion para calcular las macros del usuario segun los datos de entrada
-def calcular_macros(sexo, edad, altura, peso, pct_grasa, actividad, objetivo):
-    masa_magra = peso * (1 - pct_grasa / 100)
+def calculate_macros(sex, age, height, weight, bf, activity, goal):
+    lean_mass = weight * (1 - bf / 100)
 
-    # Indice de Masa Corporal (IMC)
-    if sexo == "Hombre":
-        bmr = 10 * peso + 6.25 * altura - 5 * edad + 5
+    if sex == "Male":
+        bmr = 10 * weight + 6.25 * height - 5 * age + 5
     else:
-        bmr = 10 * peso + 6.25 * altura - 5 * edad - 161
+        bmr = 10 * weight + 6.25 * height - 5 * age - 161
 
-    factores = {
-        "Sedentario": 1.2,
-        "Ligero": 1.375,
-        "Moderado": 1.55,
-        "Alto": 1.725,
-        "Muy alto": 1.9
-    }
-    
-    # Gasto Energetico Total Diario
-    tdee = bmr * factores[actividad]
+    activity_factor = {
+        "Sedentary": 1.2,
+        "Light": 1.375,
+        "Moderate": 1.55,
+        "High": 1.725,
+        "Very High": 1.9
+    }[activity]
 
+    tdee = bmr * activity_factor
 
-    # Recomendacion de calorias, proteinas y tipo de dieta
-    if objetivo == "Ganar músculo":
-        calorias = tdee * 1.1 + 150
-        proteina = masa_magra * 2.2
-        dietas = ["high_protein", "High Fiber"]
-    elif objetivo == "Perder peso":
-        calorias = tdee * 0.8
-        proteina = masa_magra * 2.2
-        dietas = ["low_carb", "Low Calorie"]
+    if goal == "Gain Muscle":
+        calories = tdee * 1.1 + 150
+        protein = lean_mass * 2.2
+        diets = ["high_protein", "high_fiber"]
+    elif goal == "Lose Weight":
+        calories = tdee * 0.8
+        protein = lean_mass * 2.2
+        diets = ["low_carb", "low_calorie"]
     else:
-        calorias = tdee
-        proteina = masa_magra * 2.0
-        dietas = ["Vegetarian", "Vegan", "High Fiber"]
+        calories = tdee
+        protein = lean_mass * 2.0
+        diets = ["vegetarian", "high_fiber"]
 
-        #### NOTA: Se han cambiado los nombres de las dietas ###
-
-    grasas = (calorias * 0.25) / 9
-    carbos = (calorias - (proteina * 4 + grasas * 9)) / 4
+    fat = (calories * 0.25) / 9
+    carbs = (calories - (protein * 4 + fat * 9)) / 4
 
     return {
-        "calorias": round(calorias),
-        "proteina": round(proteina),
-        "grasa": round(grasas),
-        "carbos": round(carbos),
-        "dietas": dietas
+        "calories": round(calories),
+        "protein": round(protein),
+        "fat": round(fat),
+        "carbs": round(carbs),
+        "recommended_diets": diets
     }
 
-# --- INTERFAZ ---
-
+# --------------------------------------------------
+# UI
+# --------------------------------------------------
 st.title("🥗 SmartEatAI")
-st.caption("Recomendador inteligente de comidas según tus macros")
+st.caption("Intelligent meal recommendations based on your macros")
 
-st.header("Configuración de tu Perfil")
+st.header("Profile Setup")
 
-with st.form("form_usuario", border=True):
-    # Fila 1: Datos Básicos (3 columnas para aprovechar el ancho)
-    form_col1, form_col2, form_col3 = st.columns(3)
-    
-    with form_col1:
-        sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
-        altura = st.number_input("Altura (cm)", 140, 220, 175)
+with st.form("user_form", border=True):
+    c1, c2, c3 = st.columns(3)
 
-    with form_col2:
-        edad = st.number_input("Edad", 15, 90, 30)
-        peso = st.number_input("Peso (kg)", 40, 200, 75)
-    with form_col3:
-        n_comidas = st.number_input("Comidas/día", 3, 6, 3)
-        cuerpo = st.selectbox("Complexión", ["Delgado", "Normal", "Relleno", "Obeso"])
-    
-    col_act, col_obj = st.columns(2)
-    
-    with col_act:
-        actividad = st.selectbox(
-            "Nivel de Actividad", 
-            ["Sedentario", "Ligero", "Moderado", "Alto", "Muy alto"]
-        )
-    with col_obj:
-        objetivo = st.selectbox(
-            "Objetivo Principal", 
-            ["Ganar músculo", "Perder peso", "Mantenimiento"]
-        )
-    
-    # Botón centrado y destacado
-    submit = st.form_submit_button("Generar Plan Personalizado", use_container_width=True, type="primary")
+    with c1:
+        sex = st.selectbox("Sex", ["Male", "Female"])
+        height = st.number_input("Height (cm)", 140, 220, 175)
 
+    with c2:
+        age = st.number_input("Age", 15, 90, 30)
+        weight = st.number_input("Weight (kg)", 40, 200, 75)
+
+    with c3:
+        meals_per_day = st.number_input("Meals per day", 3, 6, 3)
+        body = st.selectbox("Body Type", ["Lean", "Normal", "Stocky", "Obese"])
+
+    activity = st.selectbox("Activity Level", ["Sedentary", "Light", "Moderate", "High", "Very High"])
+    goal = st.selectbox("Main Goal", ["Gain Muscle", "Lose Weight", "Maintenance"])
+
+    submit = st.form_submit_button("Generate Personalized Plan", use_container_width=True)
+
+# --------------------------------------------------
+# PROCESS
+# --------------------------------------------------
 if submit:
-    pct = estimar_pct_grasa(sexo, cuerpo)
-    macros = calcular_macros(sexo, edad, altura, peso, pct, actividad, objetivo)
-    st.session_state.macros = macros # Guardamos las macros en sesion
-    
-    # Buscamos las comidas dividiendo macros / n_comidas
-    st.session_state.recetas = recomendar_recetas({
-        "calories": macros["calorias"]/n_comidas, 
-        "fat_content": macros["grasa"]/n_comidas,
-        "carbohydrate_content": macros["carbos"]/n_comidas,
-        "protein_content": macros["proteina"]/n_comidas,
-        "dietas": macros["dietas"]
-    }, n_comidas)
+    bf = estimate_bodyfat(sex, body)
+    macros = calculate_macros(sex, age, height, weight, bf, activity, goal)
+    st.session_state.macros = macros
 
-# --- DISPLAY ---
+# --------------------------------------------------
+# DIET SELECTOR
+# --------------------------------------------------
 if "macros" in st.session_state:
-    st.subheader("📊 Macros diarios")
     macros = st.session_state.macros
-    total_protein = 0
-    total_fat = 0
-    total_cal = 0
-    total_carb = 0
-    if "recetas" in st.session_state:
-        recetas_df = st.session_state.recetas
-        total_protein = recetas_df["protein_content"].sum()
-        if "fat_content" in recetas_df.columns:
-            total_fat = recetas_df["fat_content"].sum()
-        elif "FatContent" in recetas_df.columns:
-            total_fat = recetas_df["FatContent"].sum()
-        total_cal = recetas_df["calories"].sum()
-        total_carb = recetas_df["carbohydrate_content"].sum()
+    recommended = macros["recommended_diets"]
 
-    st.write("**Progreso de macros de las comidas recomendadas:**")
-    def macro_bar(label, value, total, color):
-        pct = min(1.0, value / total) if total > 0 else 0
-        bar_html = f'''<div style="margin-bottom:8px"><b>{label}:</b> {value:.0f} / {total:.0f} <div style='background:#eee;width:100%;height:18px;border-radius:8px;overflow:hidden'><div style='width:{pct*100:.1f}%;height:100%;background:{color};'></div></div></div>'''
-        st.markdown(bar_html, unsafe_allow_html=True)
+    options = []
+    for k, v in DIET_LABELS.items():
+        if k in recommended:
+            options.append(f"{v} [Recommended]")
+        else:
+            options.append(v)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        macro_bar("Calorías", total_cal, macros["calorias"], "#f39c12")  # naranja
-        macro_bar("Grasa", total_fat, macros["grasa"], "#27ae60")  # verde
-    with col2:
-        macro_bar("Proteína", total_protein, macros["proteina"], "#e74c3c")  # rojo
-        macro_bar("Carbohidratos", total_carb, macros["carbos"], "#2980b9")  # azul
+    selected = st.multiselect(
+        "Diet preferences",
+        options,
+        default=[o for o in options if "[Recommended]" in o]
+    )
 
-    if "dietas" in macros and macros["dietas"]:
-        st.write("**Tipos de dieta sugeridos:**")
-        label_colors = ["#8e44ad", "#16a085", "#c0392b", "#2980b9", "#f39c12", "#27ae60"]
-        labels_html = ""
-        for i, dieta in enumerate(macros["dietas"]):
-            color = label_colors[i % len(label_colors)]
-            labels_html += f"<span style='display:inline-block;background:{color};color:#fff;padding:4px 12px;border-radius:12px;margin-right:8px;margin-bottom:4px;font-size:14px'>{dieta}</span>"
-        st.markdown(labels_html, unsafe_allow_html=True)
+    def labels_to_keys(selected_labels):
+        keys = []
+        for s in selected_labels:
+            clean = s.replace(" [Recommended]", "")
+            for k, v in DIET_LABELS.items():
+                if v == clean:
+                    keys.append(k)
+        return keys
 
-if "recetas" in st.session_state:
-    df_rec = st.session_state.recetas
-    st.subheader("🍽️ Comidas recomendadas")
+    selected_diets = labels_to_keys(selected)
 
-    recetas_df = st.session_state.recetas.copy()
-    for idx, receta in recetas_df.iterrows():
-        imagenes = receta['images'].split(", ")
-        slides = [
-            {
-                "image": url,
-                "title": receta['name'],
-                "description": ""
-            }
-            for url in imagenes
-        ]
-        uui_carousel(items=slides, variant="md", key=f"carousel_{idx}")
-        st.markdown(f"### {receta['name']}")
+    st.session_state.selected_diets = selected_diets
+
+    st.session_state.recipes = recommend_recipes(
+        {
+            "calories": macros["calories"] / meals_per_day,
+            "fat_content": macros["fat"] / meals_per_day,
+            "carbohydrate_content": macros["carbs"] / meals_per_day,
+            "protein_content": macros["protein"] / meals_per_day,
+        },
+        selected_diets,
+        meals_per_day
+    )
+
+# --------------------------------------------------
+# DISPLAY RECIPES
+# --------------------------------------------------
+if "recipes" in st.session_state:
+    st.header("🍽️ Recommended Meals")
+
+    for idx, recipe in st.session_state.recipes.iterrows():
+        images = recipe["images"].split(", ")
+        slides = [{"image": img, "title": recipe["name"], "description": ""} for img in images]
+        uui_carousel(slides, variant="md", key=f"carousel_{idx}")
+
+        st.subheader(recipe["name"])
+
+        # Meal types
+        meal_types = recipe["meal_type"]
+        for mt in meal_types:
+            render_tags([mt], MEAL_COLORS.get(mt, "#34495e"))
+
+        # Diets
+        render_diet_tags(recipe["diet_type"])
+
         st.write("**Macros:**")
-        st.write(f"- Calorías: {receta['calories']} kcal")
-        st.write(f"- Proteína: {receta['protein_content']} g")
-        st.write(f"- Grasa: {receta.get('fat_content', receta.get('FatContent', 0))} g")
-        st.write(f"- Carbohidratos: {receta['carbohydrate_content']} g")
-        st.write("**Ingredientes:**")
-        st.write(receta['recipe_ingredient_parts'])
+        st.write(f"Calories: {recipe['calories']} kcal")
+        st.write(f"Protein: {recipe['protein_content']} g")
+        st.write(f"Fat: {recipe.get('fat_content', 0)} g")
+        st.write(f"Carbs: {recipe['carbohydrate_content']} g")
 
-        if st.button("Cambiar por similar", key=f"swap_{receta['id']}_{idx}"):
-            st.balloons()
-            nueva = cambiar_por_similar(receta["id"])
-            if nueva is not None:
-                st.session_state.recetas.loc[idx] = nueva
-                st.session_state._rerun = True
+        st.write("**Ingredients:**")
+        ingredients = recipe["ingredients"]
+        if isinstance(ingredients, str):
+            ingredients = json.loads(ingredients)
+        for ing in ingredients:
+            st.write(f"• {ing}")
 
-if st.session_state.get('_rerun', False):
-    st.session_state._rerun = False
-    st.rerun()
+        if st.button("Swap for similar", key=f"swap_{recipe['id']}"):
+            used = get_used_recipe_ids()
+            new_recipe = swap_similar_unique(recipe["id"], used)
+            if new_recipe is not None:
+                st.session_state.recipes.loc[idx] = new_recipe
+                st.rerun()
