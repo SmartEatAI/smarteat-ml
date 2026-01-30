@@ -150,9 +150,15 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
     distances = np.linalg.norm(X_search - user_scaled, axis=1)
     df_search["dist"] = distances
 
+    # Eliminar duplicados por ID, manteniendo el de menor distancia
+    df_search = df_search.sort_values("dist").drop_duplicates(subset=["id"], keep="first")
+
     return df_search.sort_values("dist").head(n).reset_index(drop=True)
 
-def swap_for_similar(recipe_id, n_search=11):
+def swap_for_similar(recipe_id, n_search=11, exclude_ids=None):
+    if exclude_ids is None:
+        exclude_ids = set()
+
     # Localizar la receta actual en el DF global
     idx_list = df_recipes.index[df_recipes["id"] == recipe_id].tolist()
     if not idx_list:
@@ -165,9 +171,19 @@ def swap_for_similar(recipe_id, n_search=11):
     # El modelo KNN ya está entrenado, lo usamos para buscar vecinos
     dist, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
 
-    # Los resultados de kneighbors son índices del dataframe original
-    # Saltamos el primero (que es la misma receta) y elegimos uno al azar de los otros 9
-    neighbor_idx = indices[0][np.random.randint(1, n_search)]
+    # Filtrar vecinos que ya están siendo mostrados (excluyendo la receta actual)
+    valid_neighbors = []
+    for idx in indices[0][1:]:  # Saltamos el primero (que es la misma receta)
+        neighbor_id = df_recipes.iloc[idx]["id"]
+        if neighbor_id not in exclude_ids:
+            valid_neighbors.append(idx)
+
+    # Si no hay vecinos válidos, retornar None
+    if not valid_neighbors:
+        return None
+
+    # Elegir uno al azar de los vecinos válidos
+    neighbor_idx = valid_neighbors[np.random.randint(0, len(valid_neighbors))]
 
     return df_recipes.iloc[neighbor_idx].copy()
 
@@ -412,7 +428,11 @@ if "recipes" in st.session_state:
 
                     # Botón de intercambio con lógica segura
                     if st.button(f"🔄 Swap for similar", key=f"btn_swp_{row['id']}_{idx}"):
-                        new_recipe = swap_for_similar(row['id'])
+                        # Obtener IDs de las recetas actualmente mostradas (excepto la actual)
+                        current_ids = set(st.session_state.recipes["id"].tolist())
+                        current_ids.discard(row['id'])  # No excluir la receta actual del candidato
+
+                        new_recipe = swap_for_similar(row['id'], exclude_ids=current_ids)
 
                         if new_recipe is not None:
                             # 1. Copiamos el DataFrame actual
@@ -431,3 +451,5 @@ if "recipes" in st.session_state:
                             # 4. Actualizamos y refrescamos
                             st.session_state.recipes = df_temp
                             st.rerun()
+                        else:
+                            st.warning("No similar recipes found. Try swapping a different meal.")
