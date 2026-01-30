@@ -156,6 +156,18 @@ def calculate_macros(sex, age, height, weight, bf, activity, goal):
 # --------------------------------------------------
 # UI
 # --------------------------------------------------
+st.markdown("""
+<style>
+button[kind="primary"] {
+    background-color: #e74c3c !important;
+    border-color: #e74c3c !important;
+}
+button[kind="primary"]:hover {
+    background-color: #c0392b !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🥗 SmartEatAI")
 st.caption("Intelligent meal recommendations based on your macros")
 
@@ -179,7 +191,7 @@ with st.form("user_form", border=True):
     activity = st.selectbox("Activity Level", ["Sedentary", "Light", "Moderate", "High", "Very High"])
     goal = st.selectbox("Main Goal", ["Gain Muscle", "Lose Weight", "Maintenance"])
 
-    submit = st.form_submit_button("Generate Personalized Plan", use_container_width=True)
+    submit = st.form_submit_button("Generate Personalized Plan", use_container_width=True, type="primary")
 
 # --------------------------------------------------
 # PROCESS
@@ -234,42 +246,103 @@ if "macros" in st.session_state:
     )
 
 # --------------------------------------------------
+# MACROS SUMMARY CARDS
+# --------------------------------------------------
+if "macros" in st.session_state and "recipes" in st.session_state:
+    st.subheader("📊 Daily Macro Progress")
+
+    macros = st.session_state.macros
+    recipes_df = st.session_state.recipes
+
+    total_cal = recipes_df["calories"].sum()
+    total_protein = recipes_df["protein_content"].sum()
+    total_fat = recipes_df.get("fat_content", pd.Series(0)).sum()
+    total_carb = recipes_df["carbohydrate_content"].sum()
+
+    def macro_bar(label, value, total, color):
+        pct = min(1.0, value / total) if total > 0 else 0
+        html = f"""
+        <div style="margin-bottom:10px">
+            <b>{label}:</b> {value:.0f} / {total:.0f}
+            <div style="background:#eee;width:100%;height:18px;border-radius:8px;overflow:hidden">
+                <div style="width:{pct*100:.1f}%;height:100%;background:{color};"></div>
+            </div>
+        </div>
+        """
+        st.markdown(html, unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        macro_bar("Calories", total_cal, macros["calories"], "#f39c12")
+        macro_bar("Fat", total_fat, macros["fat"], "#27ae60")
+
+    with col2:
+        macro_bar("Protein", total_protein, macros["protein"], "#e74c3c")
+        macro_bar("Carbohydrates", total_carb, macros["carbs"], "#2980b9")
+
+# --------------------------------------------------
 # DISPLAY RECIPES
+# --------------------------------------------------
+def card_container():
+    return st.container(border=True)
+
+# --------------------------------------------------
+# DISPLAY RECIPES AS CARDS
 # --------------------------------------------------
 if "recipes" in st.session_state:
     st.header("🍽️ Recommended Meals")
 
     for idx, recipe in st.session_state.recipes.iterrows():
-        images = recipe["images"].split(", ")
-        slides = [{"image": img, "title": recipe["name"], "description": ""} for img in images]
-        uui_carousel(slides, variant="md", key=f"carousel_{idx}")
+        with st.container(border=True):
 
-        st.subheader(recipe["name"])
+            # --- Carousel ---
+            images = recipe["images"].split(", ")
+            slides = [{"image": img, "title": recipe["name"], "description": ""} for img in images]
+            uui_carousel(slides, variant="md", key=f"carousel_{idx}")
 
-        # Meal types
-        meal_types = recipe["meal_type"]
-        for mt in meal_types:
-            render_tags([mt], MEAL_COLORS.get(mt, "#34495e"))
+            # --- Title ---
+            st.markdown(f"### {recipe['name']}")
 
-        # Diets
-        render_diet_tags(recipe["diet_type"])
+            # --- Meal type tags ---
+            meal_types = recipe["meal_type"]
+            if isinstance(meal_types, str):
+                meal_types = json.loads(meal_types)
 
-        st.write("**Macros:**")
-        st.write(f"Calories: {recipe['calories']} kcal")
-        st.write(f"Protein: {recipe['protein_content']} g")
-        st.write(f"Fat: {recipe.get('fat_content', 0)} g")
-        st.write(f"Carbs: {recipe['carbohydrate_content']} g")
+            html = ""
+            for mt in meal_types:
+                color = MEAL_COLORS.get(mt, "#34495e")
+                html += f"<span style='background:{color};color:white;padding:4px 12px;border-radius:12px;margin-right:6px;font-size:13px'>{mt}</span>"
+            st.markdown(html, unsafe_allow_html=True)
 
-        st.write("**Ingredients:**")
-        ingredients = recipe["ingredients"]
-        if isinstance(ingredients, str):
-            ingredients = json.loads(ingredients)
-        for ing in ingredients:
-            st.write(f"• {ing}")
+            # --- Diet tags ---
+            render_diet_tags(recipe["diet_type"])
 
-        if st.button("Swap for similar", key=f"swap_{recipe['id']}"):
-            used = get_used_recipe_ids()
-            new_recipe = swap_similar_unique(recipe["id"], used)
-            if new_recipe is not None:
-                st.session_state.recipes.loc[idx] = new_recipe
-                st.rerun()
+            st.divider()
+
+            # --- Macros ---
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"**Calories:** {recipe['calories']} kcal")
+                st.write(f"**Protein:** {recipe['protein_content']} g")
+            with col2:
+                st.write(f"**Fat:** {recipe.get('fat_content', 0)} g")
+                st.write(f"**Carbs:** {recipe['carbohydrate_content']} g")
+
+            # --- Ingredients ---
+            st.write("**Ingredients:**")
+            ingredients = recipe["ingredients"]
+            if isinstance(ingredients, str):
+                ingredients = json.loads(ingredients)
+            for ing in ingredients:
+                st.write(f"• {ing}")
+
+            st.divider()
+
+            # --- Swap button ---
+            if st.button("🔁 Swap for similar", key=f"swap_{recipe['id']}"):
+                used = get_used_recipe_ids()
+                new_recipe = swap_similar_unique(recipe["id"], used)
+                if new_recipe is not None:
+                    st.session_state.recipes.loc[idx] = new_recipe
+                    st.rerun()
