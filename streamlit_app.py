@@ -139,9 +139,11 @@ def safe_to_list(value):
 # --------------------------------------------------
 # RECOMMENDATION LOGIC
 # --------------------------------------------------
-def recommend_recipes(macros, diets, n):
-    user_df = pd.DataFrame([macros], columns=FEATURES)
+def recommend_recipes(macros, diets, n, used_ids=None):
+    if used_ids is None:
+        used_ids = set()
 
+    user_df = pd.DataFrame([macros], columns=FEATURES)
     user_scaled = scaler.transform(user_df) * MACRO_WEIGHTS
     X_weighted = X_scaled_all * MACRO_WEIGHTS
 
@@ -152,6 +154,15 @@ def recommend_recipes(macros, diets, n):
     else:
         df_search = df_recetas.copy()
         X_search = X_weighted
+
+    # Quitar recetas ya usadas
+    if used_ids:
+        mask_used = ~df_search["id"].isin(used_ids)
+        df_search = df_search[mask_used]
+        X_search = X_search[mask_used.values]
+
+    if df_search.empty:
+        return pd.DataFrame()
 
     dist = np.linalg.norm(X_search - user_scaled, axis=1)
     df_search["dist"] = dist
@@ -310,6 +321,8 @@ if "macros" in st.session_state:
 
     st.session_state.selected_diets = selected_diets
 
+    used_ids = get_used_recipe_ids()
+
     st.session_state.recipes = recommend_recipes(
         {
             "calories": macros["calories"] / meals_per_day,
@@ -318,8 +331,10 @@ if "macros" in st.session_state:
             "protein_content": macros["protein"] / meals_per_day,
         },
         selected_diets,
-        meals_per_day
+        meals_per_day,
+        used_ids=used_ids
     )
+
 
 # --------------------------------------------------
 # MACROS SUMMARY CARDS
