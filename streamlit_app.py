@@ -174,21 +174,19 @@ def recommend_recipes(macros, diets, n, used_ids=None):
 
     return df_search.sort_values("dist").head(n).reset_index(drop=True)
 
-def swap_similar_unique(recipe_id, used_ids, max_candidates=30):
+def swap_similar_unique(recipe_id, blocked_ids, max_candidates=200):
     idx_list = df_recetas.index[df_recetas["id"] == recipe_id].tolist()
     if not idx_list:
         return None
 
     idx = idx_list[0]
-
-    vec_df = df_recetas.loc[[idx], FEATURES]
-    vec = scaler.transform(vec_df) * MACRO_WEIGHTS
+    vec = scaler.transform(df_recetas.loc[[idx], FEATURES]) * MACRO_WEIGHTS
 
     _, indices = knn.kneighbors(vec, n_neighbors=max_candidates)
 
     for i in indices[0][1:]:
         candidate = df_recetas.iloc[i]
-        if candidate["id"] not in used_ids:
+        if candidate["id"] not in blocked_ids:
             return candidate.copy()
 
     return None
@@ -462,16 +460,23 @@ if "recipes" in st.session_state:
                 st.write("**Ingredients:**")
                 ingredients = safe_to_list(row.get("recipe_ingredient_parts"))
 
-                #for ing in ingredients:
-                #    st.write(f"• {ing}")
+                if ingredients:
+                    formatted = [
+                        ing.capitalize() if i == 0 else ing.lower()
+                        for i, ing in enumerate(ingredients)
+                    ]
+
+                    st.write(", ".join(formatted) + ".")
 
                 # -----------
                 # SWAP BUTTON
                 # -----------
                 if st.button("🔄 Swap for similar", key=f"btn_swp_{row['id']}_{idx}"):
-                    used_ids = get_used_recipe_ids(exclude_id=row["id"])
 
-                    nueva = swap_similar_unique(row["id"], used_ids)
+                    visible_ids = set(st.session_state.recipes["id"])
+                    visible_ids.discard(row["id"])
+
+                    nueva = swap_similar_unique(row["id"], visible_ids)
 
                     if nueva is not None:
                         df_new = st.session_state.recipes.copy().reset_index(drop=True)
@@ -482,8 +487,4 @@ if "recipes" in st.session_state:
 
                         df_new.loc[idx] = nueva[df_new.columns]
                         st.session_state.recipes = df_new
-
-                        st.success("New recipe available ✨")
                         st.rerun()
-                    else:
-                        st.warning("No alternative recipes 😕")
