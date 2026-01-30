@@ -232,47 +232,34 @@ if "recetas" in st.session_state:
     df_rec = st.session_state.recetas
     st.subheader("🍽️ Comidas recomendadas")
 
-    # Mostrar recetas
-    for idx, row in df_rec.iterrows():
-    # Creamos un contenedor único para cada receta
-        with st.container(border=True):
-            st.subheader(f"Comida {idx+1}: {row['name']}")
-            
-            c1, c2 = st.columns([1, 2])
-            
-            with c1:
-                # SOLUCIÓN AL DUPLICATE ID: Añadimos una key única basada en el ID y el índice
-                imgs = row['images'].split(", ")
-                slides = [{"image": url, "title": "", "description": ""} for url in imgs[:3]]
-                
-                uui_carousel(
-                    items=slides, 
-                    variant="sm", 
-                    key=f"carousel_{row['id']}_{idx}"  # <--- Key única aquí
-                )
-                
-            with c2:
-                st.write(f"**🔥 Calorías:** {row['calories']} kcal")
-                st.write(f"**🥩 Proteína:** {row['protein_content']}g | **🥑 Grasa:** {row['fat_content']}g | **🍞 Carbo:** {row['carbohydrate_content']}g")
-                
-                # Botón de intercambio con lógica segura
-                if st.button(f"🔄 Cambiar por similar", key=f"btn_swp_{row['id']}_{idx}"):
-                    nueva_receta = cambiar_por_similar(row['id'])
-                    
-                    if nueva_receta is not None:
-                        # 1. Copiamos el DataFrame actual
-                        df_temp = st.session_state.recetas.copy()
-                        
-                        # 2. Alineamos las columnas de la nueva receta con las del DataFrame
-                        # Esto asegura que si existe la columna 'dist', no rompa el código
-                        for col in df_temp.columns:
-                            if col not in nueva_receta:
-                                nueva_receta[col] = 0
-                        
-                        # 3. REEMPLAZO SEGURO: Usamos .values para evitar conflictos de índices
-                        # Seleccionamos solo las columnas que ya existen en el DataFrame de la sesión
-                        df_temp.iloc[idx] = nueva_receta[df_temp.columns].values
-                        
-                        # 4. Actualizamos y refrescamos
-                        st.session_state.recetas = df_temp
-                        st.rerun()
+    recetas_df = st.session_state.recetas.copy()
+    for idx, receta in recetas_df.iterrows():
+        imagenes = receta['images'].split(", ")
+        slides = [
+            {
+                "image": url,
+                "title": receta['name'],
+                "description": ""
+            }
+            for url in imagenes
+        ]
+        uui_carousel(items=slides, variant="md", key=f"carousel_{idx}")
+        st.markdown(f"### {receta['name']}")
+        st.write("**Macros:**")
+        st.write(f"- Calorías: {receta['calories']} kcal")
+        st.write(f"- Proteína: {receta['protein_content']} g")
+        st.write(f"- Grasa: {receta.get('fat_content', receta.get('FatContent', 0))} g")
+        st.write(f"- Carbohidratos: {receta['carbohydrate_content']} g")
+        st.write("**Ingredientes:**")
+        st.write(receta['recipe_ingredient_parts'])
+
+        if st.button("Cambiar por similar", key=f"swap_{receta['id']}_{idx}"):
+            st.balloons()
+            nueva = cambiar_por_similar(receta["id"])
+            if nueva is not None:
+                st.session_state.recetas.loc[idx] = nueva
+                st.session_state._rerun = True
+
+if st.session_state.get('_rerun', False):
+    st.session_state._rerun = False
+    st.rerun()
