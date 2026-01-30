@@ -92,6 +92,44 @@ def normalize_to_list(value):
 
     return []
 
+import json
+
+def safe_to_list(value):
+    """
+    Convierte distintos formatos a lista de strings:
+    - Lista real -> lista
+    - JSON string -> lista
+    - String separado por comas -> lista
+    - None / NaN -> []
+    """
+    if value is None:
+        return []
+
+    # Si ya es lista
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    # Si es string
+    if isinstance(value, str):
+        value = value.strip()
+
+        if not value:
+            return []
+
+        # Intentar JSON
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return [str(v).strip() for v in parsed if str(v).strip()]
+        except Exception:
+            pass
+
+        # Fallback: separado por comas
+        return [v.strip() for v in value.split(",") if v.strip()]
+
+    return []
+
+
 # --------------------------------------------------
 # RECOMMENDATION LOGIC
 # --------------------------------------------------
@@ -380,9 +418,7 @@ if "recipes" in st.session_state:
 
                 # --- Ingredients ---
                 st.write("**Ingredients:**")
-                ingredients = row.get("recipe_ingredient_parts", [])
-                if isinstance(ingredients, str):
-                    ingredients = json.loads(ingredients)
+                ingredients = safe_to_list(row.get("recipe_ingredient_parts"))
 
                 for ing in ingredients:
                     st.write(f"• {ing}")
