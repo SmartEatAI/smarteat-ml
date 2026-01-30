@@ -1,96 +1,74 @@
 import streamlit as st
+import pickle
+import ast
 import pandas as pd
 import numpy as np
+import gdown
 from joblib import load
 from streamlit_carousel_uui import uui_carousel
 
-# --- CONFIGURACIÓN Y CARGA ---
-st.set_page_config(page_title="SmartEatAI")
-
 @st.cache_resource
-
-def cargar_recursos():
-    # Cargar archivos
+def cargar_modelos():
     df = load("files/df_recetas.joblib")
     scaler = load("files/scaler.joblib")
     knn = load("files/knn.joblib")
-    
-    # Pre-escalar el dataset completo para evitar procesarlo en cada recomendación, para ahorrar CPU
-    FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
-    X_scaled_all = scaler.transform(df[FEATURES])
-    
-    return df, scaler, knn, X_scaled_all
 
-df_recetas, scaler, knn, X_scaled_all = cargar_recursos()
+    return df, scaler, knn
 
-FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
-MACRO_WEIGHTS = np.array([1.5, 0.8, 1.0, 1.2]) # Cal, Fat, Carb, Prot
 
-# --- LÓGICA ---
+df_recetas, scaler, knn = cargar_modelos()
 
-def recomendar_recetas(macros_obj, n=3):
-    # Vector de usuario
-    user_vec = np.array([[
+st.dataframe(df_recetas)
+
+FEATURES = [
+    'calories',
+    'fat_content',
+    'carbohydrate_content',
+    'protein_content'
+]
+
+def recomendar_recetas(macros_obj, n=33):
+
+    user_vec = scaler.transform([[
         macros_obj["calories"],
+        macros_obj["protein_content"],
         macros_obj["fat_content"],
-        macros_obj["carbohydrate_content"],
-        macros_obj["protein_content"]
+        macros_obj["carbohydrate_content"]
     ]])
-    
-    # Escalar el vector de usuario
-    user_scaled = scaler.transform(user_vec) * MACRO_WEIGHTS
-    X_weighted = X_scaled_all * MACRO_WEIGHTS
-    
-    # Filtrado por dieta
-    dietas_usuario = macros_obj.get("dietas", [])
-    if dietas_usuario:
-        mask = df_recetas["diet_type"].str.contains("|".join(dietas_usuario), case=False, na=False)
-        indices_validos = np.where(mask)[0]
-        X_search = X_weighted[indices_validos]
-        df_search = df_recetas.iloc[indices_validos].copy()
-    else:
-        X_search = X_weighted
-        df_search = df_recetas.copy()
 
-    # Cálculo de distancia ##### REPASAR ESTO #####
-    distancias = np.linalg.norm(X_search - user_scaled, axis=1)
-    df_search["dist"] = distancias
-    
-    return df_search.sort_values("dist").head(n).reset_index(drop=True)
+    X_scaled = scaler.transform(df_recetas[FEATURES])
 
-def cambiar_por_similar(receta_id, n_busqueda=11):
-    # Localizar la receta actual en el DF global
-    idx_list = df_recetas.index[df_recetas["id"] == receta_id].tolist()
-    if not idx_list:
-        return None
-    
-    # Extraer el vector de características ya escalado (usando nuestra matriz precargada)
-    idx_global = idx_list[0]
-    vec_receta = X_scaled_all[idx_global].reshape(1, -1)
-    
-    # El modelo KNN ya está entrenado, lo usamos para buscar vecinos
-    dist, indices = knn.kneighbors(vec_receta, n_neighbors=n_busqueda)
-    
-    # Los resultados de kneighbors son índices del dataframe original
-    # Saltamos el primero (que es la misma receta) y elegimos uno al azar de los otros 9
-    idx_vecino = indices[0][np.random.randint(1, n_busqueda)]
-    
-    return df_recetas.iloc[idx_vecino].copy()
+    distances, idxs = knn.kneighbors(
+        user_vec,
+        n_neighbors=min(n, len(df_recetas))
+    )
+
+    return df_recetas.iloc[idxs[0]]
 
 
-# --- FUNCIONES DE CÁLCULO ---
+def cambiar_por_similar(receta_id):
+
+    idx = df_recetas[df_recetas["id"] == receta_id].index[0]
+
+    X_rec = scaler.transform([df_recetas.loc[idx, FEATURES]])
+
+    distances, idxs = knn.kneighbors(X_rec, n_neighbors=4)
+
+    for i in idxs[0][1:]:
+        return df_recetas.iloc[i]
+
+    return None
+
+
 def estimar_pct_grasa(sexo, categoria):
-    mapping = {
-        "Hombre": {"Delgado": 12, "Normal": 18, "Relleno": 25, "Obeso": 32},
-        "Mujer": {"Delgado": 20, "Normal": 26, "Relleno": 33, "Obeso": 40}
-    }
-    return mapping[sexo][categoria]
+    if sexo == "Hombre":
+        return {"Delgado": 12, "Normal": 18, "Relleno": 25, "Obeso": 32}[categoria]
+    else:
+        return {"Delgado": 20, "Normal": 26, "Relleno": 33, "Obeso": 40}[categoria]
 
-# Funcion para calcular las macros del usuario segun los datos de entrada
 def calcular_macros(sexo, edad, altura, peso, pct_grasa, actividad, objetivo):
     masa_magra = peso * (1 - pct_grasa / 100)
 
-    # Indice de Masa Corporal (IMC)
     if sexo == "Hombre":
         bmr = 10 * peso + 6.25 * altura - 5 * edad + 5
     else:
@@ -103,26 +81,21 @@ def calcular_macros(sexo, edad, altura, peso, pct_grasa, actividad, objetivo):
         "Alto": 1.725,
         "Muy alto": 1.9
     }
-    
-    # Gasto Energetico Total Diario
+
     tdee = bmr * factores[actividad]
 
-
-    # Recomendacion de calorias, proteinas y tipo de dieta
     if objetivo == "Ganar músculo":
         calorias = tdee * 1.1 + 150
         proteina = masa_magra * 2.2
-        dietas = ["high_protein", "High Fiber"]
+        dietas = ["alta en proteína", "balanceada"]
     elif objetivo == "Perder peso":
         calorias = tdee * 0.8
         proteina = masa_magra * 2.2
-        dietas = ["low_carb", "Low Calorie"]
+        dietas = ["low-carb", "keto"]
     else:
         calorias = tdee
         proteina = masa_magra * 2.0
-        dietas = ["Vegetarian", "Vegan", "High Fiber"]
-
-        #### NOTA: Se han cambiado los nombres de las dietas ###
+        dietas = ["balanceada", "mediterránea"]
 
     grasas = (calorias * 0.25) / 9
     carbos = (calorias - (proteina * 4 + grasas * 9)) / 4
@@ -135,59 +108,59 @@ def calcular_macros(sexo, edad, altura, peso, pct_grasa, actividad, objetivo):
         "dietas": dietas
     }
 
-# --- INTERFAZ ---
+st.set_page_config(
+    page_title="SmartEatAI",
+    layout="centered"
+)
 
 st.title("🥗 SmartEatAI")
 st.caption("Recomendador inteligente de comidas según tus macros")
 
-st.header("Configuración de tu Perfil")
-
-with st.form("form_usuario", border=True):
-    # Fila 1: Datos Básicos (3 columnas para aprovechar el ancho)
-    form_col1, form_col2, form_col3 = st.columns(3)
-    
+with st.form("form_usuario"):
+    form_col1, form_col2 = st.columns(2)
     with form_col1:
         sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
         altura = st.number_input("Altura (cm)", 140, 220, 175)
-
-    with form_col2:
-        edad = st.number_input("Edad", 15, 90, 30)
-        peso = st.number_input("Peso (kg)", 40, 200, 75)
-    with form_col3:
-        n_comidas = st.number_input("Comidas/día", 3, 6, 3)
-        cuerpo = st.selectbox("Complexión", ["Delgado", "Normal", "Relleno", "Obeso"])
-    
-    col_act, col_obj = st.columns(2)
-    
-    with col_act:
         actividad = st.selectbox(
-            "Nivel de Actividad", 
+            "Nivel de actividad",
             ["Sedentario", "Ligero", "Moderado", "Alto", "Muy alto"]
         )
-    with col_obj:
-        objetivo = st.selectbox(
-            "Objetivo Principal", 
+
+    with form_col2:
+        edad = st.number_input("Edad", 10, 100, 28)
+        peso = st.number_input("Peso (kg)", 40.0, 200.0, 75.0)
+        cuerpo = st.selectbox(
+            "Tipo de cuerpo",
+            ["Delgado", "Normal", "Relleno", "Obeso"]
+        )
+
+    objetivo = st.selectbox(
+            "Objetivo",
             ["Ganar músculo", "Perder peso", "Mantenimiento"]
         )
-    
-    # Botón centrado y destacado
-    submit = st.form_submit_button("Generar Plan Personalizado", use_container_width=True, type="primary")
+    submit = st.form_submit_button("Calcular y recomendar")
 
 if submit:
     pct = estimar_pct_grasa(sexo, cuerpo)
-    macros = calcular_macros(sexo, edad, altura, peso, pct, actividad, objetivo)
-    st.session_state.macros = macros # Guardamos las macros en sesion
-    
-    # Buscamos las comidas dividiendo macros / n_comidas
-    st.session_state.recetas = recomendar_recetas({
-        "calories": macros["calorias"]/n_comidas, 
-        "fat_content": macros["grasa"]/n_comidas,
-        "carbohydrate_content": macros["carbos"]/n_comidas,
-        "protein_content": macros["proteina"]/n_comidas,
-        "dietas": macros["dietas"]
-    }, n_comidas)
 
-# --- DISPLAY ---
+    macros = calcular_macros(
+        sexo, edad, altura, peso, pct, actividad, objetivo
+    )
+
+    st.session_state.macros = macros
+    st.session_state.recetas = recomendar_recetas(
+        {
+            "calories": macros["calorias"] / 3,
+            "protein_content": macros["proteina"] / 3,
+            "fat_content": macros["grasa"] / 3,
+            "carbohydrate_content": macros["carbos"] / 3
+        },
+        n=3
+    )
+
+    st.balloons()
+
+
 if "macros" in st.session_state:
     st.subheader("📊 Macros diarios")
     macros = st.session_state.macros
@@ -229,7 +202,6 @@ if "macros" in st.session_state:
         st.markdown(labels_html, unsafe_allow_html=True)
 
 if "recetas" in st.session_state:
-    df_rec = st.session_state.recetas
     st.subheader("🍽️ Comidas recomendadas")
 
     recetas_df = st.session_state.recetas.copy()
@@ -243,7 +215,7 @@ if "recetas" in st.session_state:
             }
             for url in imagenes
         ]
-        uui_carousel(items=slides, variant="md", key=f"carousel_{idx}")
+        uui_carousel(items=slides, variant="md")
         st.markdown(f"### {receta['name']}")
         st.write("**Macros:**")
         st.write(f"- Calorías: {receta['calories']} kcal")
