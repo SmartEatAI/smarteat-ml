@@ -76,7 +76,6 @@ def get_used_recipe_ids(exclude_id=None):
     return ids
 
 
-
 def normalize_to_list(value):
     """
     Converts a value that may be:
