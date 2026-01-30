@@ -296,7 +296,7 @@ if submit:
 # --------------------------------------------------
 # DIET SELECTOR
 # --------------------------------------------------
-if "macros" in st.session_state and "recipes" not in st.session_state:
+if "macros" in st.session_state:
     macros = st.session_state.macros
     recommended = macros["recommended_diets"]
 
@@ -310,7 +310,8 @@ if "macros" in st.session_state and "recipes" not in st.session_state:
     selected = st.multiselect(
         "Diet preferences",
         options,
-        default=[o for o in options if "[Recommended]" in o]
+        default=[o for o in options if "[Recommended]" in o],
+        key="diet_selector"
     )
 
     def labels_to_keys(selected_labels):
@@ -324,23 +325,30 @@ if "macros" in st.session_state and "recipes" not in st.session_state:
 
     selected_diets = labels_to_keys(selected)
 
+    if "prev_selected_diets" not in st.session_state:
+        st.session_state.prev_selected_diets = selected_diets
+        regenerate = True
+    else:
+        regenerate = selected_diets != st.session_state.prev_selected_diets
+
+    if regenerate:
+        used_ids = get_used_recipe_ids()
+
+        st.session_state.recipes = recommend_recipes(
+            {
+                "calories": macros["calories"] / meals_per_day,
+                "fat_content": macros["fat"] / meals_per_day,
+                "carbohydrate_content": macros["carbs"] / meals_per_day,
+                "protein_content": macros["protein"] / meals_per_day,
+            },
+            selected_diets,
+            meals_per_day,
+            used_ids=used_ids
+        )
+
+        st.session_state.prev_selected_diets = selected_diets
+
     st.session_state.selected_diets = selected_diets
-
-    used_ids = get_used_recipe_ids()
-
-    st.session_state.recipes = recommend_recipes(
-        {
-            "calories": macros["calories"] / meals_per_day,
-            "fat_content": macros["fat"] / meals_per_day,
-            "carbohydrate_content": macros["carbs"] / meals_per_day,
-            "protein_content": macros["protein"] / meals_per_day,
-        },
-        selected_diets,
-        meals_per_day,
-        used_ids=used_ids
-    )
-
-
 # --------------------------------------------------
 # MACROS SUMMARY CARDS
 # --------------------------------------------------
