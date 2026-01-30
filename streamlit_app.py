@@ -344,7 +344,11 @@ if "macros" in st.session_state and "recipes" not in st.session_state:
 # --------------------------------------------------
 # MACROS SUMMARY CARDS
 # --------------------------------------------------
-if "macros" in st.session_state and "recipes" in st.session_state:
+if (
+    "macros" in st.session_state
+    and "recipes" in st.session_state
+    and not st.session_state.recipes.empty
+):
     st.subheader("📊 Daily Macro Progress")
 
     macros = st.session_state.macros
