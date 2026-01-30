@@ -142,7 +142,7 @@ def safe_to_list(value):
 def recommend_recipes(macros, diets, n):
     user_df = pd.DataFrame([macros], columns=FEATURES)
 
-    user_scaled = scaler.transform(user_df).values * MACRO_WEIGHTS
+    user_scaled = scaler.transform(user_df) * MACRO_WEIGHTS
     X_weighted = X_scaled_all * MACRO_WEIGHTS
 
     if diets:
@@ -156,8 +156,7 @@ def recommend_recipes(macros, diets, n):
     dist = np.linalg.norm(X_search - user_scaled, axis=1)
     df_search["dist"] = dist
 
-    df_sorted = df_search.sort_values("dist")
-    return df_sorted.head(n).reset_index(drop=True)
+    return df_search.sort_values("dist").head(n).reset_index(drop=True)
 
 def swap_similar_unique(recipe_id, used_ids, max_candidates=30):
     idx_list = df_recetas.index[df_recetas["id"] == recipe_id].tolist()
