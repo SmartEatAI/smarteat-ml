@@ -64,6 +64,34 @@ def get_used_recipe_ids():
         return set()
     return set(st.session_state.recipes["id"].tolist())
 
+def normalize_to_list(value):
+    """
+    Converts a value that may be:
+    - list
+    - comma-separated string
+    - JSON string
+    into a clean Python list of strings
+    """
+    if value is None:
+        return []
+
+    # Already a list
+    if isinstance(value, list):
+        return value
+
+    # JSON list as string
+    if isinstance(value, str) and value.strip().startswith("["):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
+
+    # Comma-separated string
+    if isinstance(value, str):
+        return [v.strip() for v in value.split(",") if v.strip()]
+
+    return []
+
 # --------------------------------------------------
 # RECOMMENDATION LOGIC
 # --------------------------------------------------
@@ -339,7 +367,9 @@ if "recipes" in st.session_state:
                 st.markdown(tags_html, unsafe_allow_html=True)
 
                 # --- Diet tags ---
-                render_diet_tags(row.get("diet_type", []))
+                diet_types = normalize_to_list(row.get("diet_type"))
+                render_diet_tags(diet_types)
+
 
                 st.write(
                     f"**🔥 Calories:** {row['calories']} kcal  \n"
