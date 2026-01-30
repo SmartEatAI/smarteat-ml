@@ -60,14 +60,21 @@ def render_diet_tags(diets):
     st.markdown(html, unsafe_allow_html=True)
 
 def get_used_recipe_ids(exclude_id=None):
-    if "recipes" not in st.session_state:
+    if (
+        "recipes" not in st.session_state
+        or st.session_state.recipes is None
+        or st.session_state.recipes.empty
+        or "id" not in st.session_state.recipes.columns
+    ):
         return set()
 
-    ids = set(st.session_state.recipes["id"].tolist())
+    ids = set(st.session_state.recipes["id"].dropna().tolist())
+
     if exclude_id is not None:
         ids.discard(exclude_id)
 
     return ids
+
 
 
 def normalize_to_list(value):
@@ -134,7 +141,6 @@ def safe_to_list(value):
         return [v.strip() for v in value.split(",") if v.strip()]
 
     return []
-
 
 # --------------------------------------------------
 # RECOMMENDATION LOGIC
