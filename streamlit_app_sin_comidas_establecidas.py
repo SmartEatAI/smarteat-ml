@@ -22,7 +22,6 @@ def load_resources():
     return df, scaler, knn, X_scaled_all
 
 df_recipes, scaler, knn, X_scaled_all = load_resources()
-st.dataframe(df_recipes)
 
 FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
 MACRO_WEIGHTS = np.array([1.5, 0.8, 1.0, 1.2])  # Cal, Fat, Carb, Prot
@@ -278,7 +277,6 @@ def calculate_macros(sex, age, height, weight, bodyfat_pct, activity, goal):
     }
 
 # --- INTERFACE ---
-
 st.title("🥗 SmartEatAI")
 st.caption("Intelligent meal recommender based on your macros")
 
@@ -457,7 +455,6 @@ if "recipes" in st.session_state:
 
                     st.write(f"**🔥 Calories:** {row['calories']} kcal")
                     st.write(f"**🥩 Protein:** {row['protein_content']}g | **🥑 Fat:** {row['fat_content']}g | **🍞 Carbs:** {row['carbohydrate_content']}g")
-                    st.write(f"**🛒 Ingredients:** {row["recipe_ingredient_parts"]}")
 
                     # Swap button with safe logic
                     if st.button(f"🔄 Swap for similar", key=f"btn_swp_{row['id']}_{idx}"):
