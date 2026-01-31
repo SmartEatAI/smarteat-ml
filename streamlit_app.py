@@ -175,14 +175,18 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
 
 def swap_for_similar(
     recipe_id,
-    selected_diets,
+    recommended_diets,
+    selected_extra=None,
     n_search=30,
     exclude_ids=None
 ):
     if exclude_ids is None:
         exclude_ids = set()
+    if selected_extra is None:
+        selected_extra = []
 
-    normalized_selected = set(normalize_label(d) for d in selected_diets)
+    recommended_set = set(normalize_label(d) for d in recommended_diets)
+    extra_set = set(normalize_label(d) for d in selected_extra)
 
     idx_list = df_recipes.index[df_recipes["id"] == recipe_id].tolist()
     if not idx_list:
@@ -191,31 +195,29 @@ def swap_for_similar(
     recipe_vec = X_scaled_all[idx_list[0]].reshape(1, -1)
     _, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
 
-    exact = []
-    and_match = []
-    or_match = []
+    valid_candidates = []
 
     for idx in indices[0][1:]:
         row = df_recipes.iloc[idx]
         rid = row["id"]
-
         if rid in exclude_ids:
             continue
 
-        candidate = set(
-            normalize_label(d) for d in safe_to_list(row["diet_type"])
-        )
+        candidate_diets = set(normalize_label(d) for d in safe_to_list(row["diet_type"]))
 
-        if candidate == normalized_selected:
-            exact.append(row)
-        elif normalized_selected.issubset(candidate):
-            and_match.append(row)
-        elif candidate & normalized_selected:
-            or_match.append(row)
+        # Hard constraint: always include recommended diets
+        if not recommended_set.issubset(candidate_diets):
+            continue
 
-    for bucket in (exact, and_match, or_match):
-        if bucket:
-            return bucket[np.random.randint(len(bucket))].copy()
+        # Soft constraint: include some of the extra if any
+        if extra_set:
+            if candidate_diets & extra_set:
+                valid_candidates.append(row)
+        else:
+            valid_candidates.append(row)
+
+    if valid_candidates:
+        return valid_candidates[np.random.randint(len(valid_candidates))].copy()
 
     return None
 
@@ -462,9 +464,11 @@ if "recipes" in st.session_state:
 
                         new_recipe = swap_for_similar(
                             row['id'],
-                            st.session_state.selected_diets,
+                            recommended_diets=macros["recommended_diets"],
+                            selected_extra=[d for d in st.session_state.selected_diets if d not in macros["recommended_diets"]],
                             exclude_ids=current_ids
                         )
+
 
                         if new_recipe is not None:
                             # 1. Copy the current DataFrame
