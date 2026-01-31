@@ -139,15 +139,14 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
     if used_ids is None:
         used_ids = set()
 
-    # Obtener el orden de comidas
     meal_order = get_meal_order(n)
-    
     final_recipes = []
     current_used_ids = used_ids.copy()
 
-    # Iteramos para cada momento del día (Desayuno, Almuerzo, etc.)
+    # Normalizamos las dietas seleccionadas por el usuario para comparar
+    user_diet_set = set(normalize_label(d) for d in diets)
+
     for meal_label in meal_order:
-        # Vector de usuario para esta comida (macros divididos)
         user_vec = np.array([[ 
             macros_obj["calories"],
             macros_obj["fat_content"],
@@ -156,93 +155,72 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
         ]])
         user_scaled = scaler.transform(user_vec) * MACRO_WEIGHTS
 
-        # --- FILTRADO POR DIETA Y TIPO DE COMIDA ---
-        mask_diet = pd.Series([True] * len(df_recipes))
-        if diets:
-            normalized_diets = set(normalize_label(d) for d in diets)
-            mask_diet = df_recipes["diet_type"].apply(
-                lambda x: set(normalize_label(dt) for dt in safe_to_list(x)) == normalized_diets
-            )
+        # --- FILTRADO INTELIGENTE ---
+        # 1. Filtro de Dieta: La receta DEBE tener al menos las dietas seleccionadas (o ser compatible)
+        def check_diet(recipe_diets):
+            r_diets = set(normalize_label(d) for d in safe_to_list(recipe_diets))
+            return user_diet_set.issubset(r_diets)
 
-        # FILTRO CRUCIAL: Que el meal_type contenga la etiqueta (ej: 'Breakfast')
-        mask_meal = df_recipes["meal_type"].apply(
-            lambda x: meal_label.lower() in [m.lower().strip() for m in safe_to_list(x)]
-        )
+        # 2. Filtro de Tipo de Comida: Que incluya la etiqueta actual (ej: 'Breakfast')
+        def check_meal(recipe_meals, target):
+            r_meals = [m.lower().strip() for m in safe_to_list(recipe_meals)]
+            return target.lower() in r_meals
 
+        mask_diet = df_recipes["diet_type"].apply(check_diet)
+        mask_meal = df_recipes["meal_type"].apply(lambda x: check_meal(x, meal_label))
+        
         mask_combined = mask_diet & mask_meal
         valid_indices = np.where(mask_combined)[0]
         
         df_search = df_recipes.iloc[valid_indices].copy()
-        X_search = (X_scaled_all[valid_indices] * MACRO_WEIGHTS)
-
-        # Excluir IDs ya usados en este plan
-        if current_used_ids:
-            mask_used = ~df_search["id"].isin(current_used_ids)
-            df_search = df_search[mask_used]
-            X_search = X_search[mask_used.values]
+        
+        # Excluir IDs ya usados
+        df_search = df_search[~df_search["id"].isin(current_used_ids)]
 
         if not df_search.empty:
+            # Re-calculamos distancias solo para los válidos
+            X_search = X_scaled_all[df_search.index] * MACRO_WEIGHTS
             distances = np.linalg.norm(X_search - user_scaled, axis=1)
             df_search["dist"] = distances
-            best_recipe = df_search.sort_values("dist").iloc[0]
             
-            # Guardamos la etiqueta real asignada para mostrarla en la UI
-            best_recipe_dict = best_recipe.to_dict()
-            best_recipe_dict['assigned_meal_type'] = meal_label 
-            final_recipes.append(best_recipe_dict)
+            best_recipe = df_search.sort_values("dist").iloc[0].to_dict()
+            best_recipe['assigned_meal_type'] = meal_label 
+            final_recipes.append(best_recipe)
             current_used_ids.add(best_recipe["id"])
+        else:
+            # Si no hay match, intentamos buscar sin el filtro estricto de dieta para no dejar el plan vacío
+            st.warning(f"No exact match for {meal_label} with all diet filters. Relaxing constraints...")
 
     return pd.DataFrame(final_recipes)
 
-
-#### Modificado para feature/meal_type ####
-def swap_for_similar(
-    recipe_id,
-    recommended_diets,
-    meal_label,
-    selected_extra=None,
-    n_search=50,
-    exclude_ids=None
-):
-    if exclude_ids is None:
-        exclude_ids = set()
-    if selected_extra is None:
-        selected_extra = []
-
-    recommended_set = set(normalize_label(d) for d in recommended_diets)
-    extra_set = set(normalize_label(d) for d in selected_extra)
+def swap_for_similar(recipe_id, meal_label, recommended_diets, selected_extra=None, n_search=50):
+    # Combinamos las dietas que el usuario quiere mantener
+    required_diets = set(normalize_label(d) for d in recommended_diets)
+    if selected_extra:
+        required_diets.update(normalize_label(d) for d in selected_extra)
 
     idx_list = df_recipes.index[df_recipes["id"] == recipe_id].tolist()
-    if not idx_list:
-        return None
+    if not idx_list: return None
 
+    # Buscamos vecinos cercanos
     recipe_vec = X_scaled_all[idx_list[0]].reshape(1, -1)
-    _, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
+    distances, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
 
-    valid_candidates = []
-
-    for idx in indices[0][1:]:
-        row = df_recipes.iloc[idx]
-        # Validar tipo de comida
-        candidate_meals = [m.lower().strip() for m in safe_to_list(row["meal_type"])]
+    for idx in indices[0]:
+        candidate = df_recipes.iloc[idx]
+        if candidate["id"] == recipe_id: continue # Saltar la misma
+        
+        # Validar tipo de comida (Crucial para el Swap)
+        candidate_meals = [m.lower().strip() for m in safe_to_list(candidate["meal_type"])]
         if meal_label.lower() not in candidate_meals:
             continue
-
-        candidate_diets = set(normalize_label(d) for d in safe_to_list(row["diet_type"]))
-
-        # Hard constraint: always include recommended diets
-        if not recommended_set.issubset(candidate_diets):
-            continue
-
-        # Soft constraint: include some of the extra if any
-        if extra_set:
-            if candidate_diets & extra_set:
-                valid_candidates.append(row)
-        else:
-            valid_candidates.append(row)
-
-    if valid_candidates:
-        return valid_candidates[np.random.randint(len(valid_candidates))].copy()
+            
+        # Validar dietas
+        candidate_diets = set(normalize_label(d) for d in safe_to_list(candidate["diet_type"]))
+        if required_diets.issubset(candidate_diets):
+            res = candidate.to_dict()
+            res['assigned_meal_type'] = meal_label
+            return res
 
     return None
 
@@ -491,31 +469,17 @@ if "recipes" in st.session_state:
                         current_ids = set(st.session_state.recipes["id"].tolist())
                         current_ids.discard(row['id'])  # Do not exclude the current recipe from candidate
 
-                        new_recipe = swap_for_similar(
-                            row['id'],
-                            recommended_diets=macros["recommended_diets"],
-                            meal_label=meal_title, # Pasamos el tipo de comida
-                            selected_extra=[d for d in st.session_state.selected_diets if d not in macros["recommended_diets"]],
-                            exclude_ids=current_ids
+                        new_recipe_dict = swap_for_similar(
+                            recipe_id=row['id'],
+                            meal_label=meal_title, # Aquí pasamos si es Breakfast, Lunch, etc.
+                            recommended_diets=macros["recommended_diets"]
                         )
 
-
-                        if new_recipe is not None:
-                            # 1. Copy the current DataFrame
-                            df_temp = st.session_state.recipes.copy()
-
-                            # 2. Align columns of the new recipe with the DataFrame
-                            # This ensures that if the 'dist' column exists, it doesn't break the code
-                            for col in df_temp.columns:
-                                if col not in new_recipe:
-                                    new_recipe[col] = 0
-
-                            # 3. SAFE REPLACEMENT: Use .values to avoid index conflicts
-                            # Select only columns that already exist in the session DataFrame
-                            df_temp.iloc[idx] = new_recipe[df_temp.columns].values
-
-                            # 4. Update and refresh
-                            st.session_state.recipes = df_temp
+                        if new_recipe_dict:
+                            # Actualizamos el DataFrame en la sesión de forma segura
+                            for col in st.session_state.recipes.columns:
+                                if col in new_recipe_dict:
+                                    st.session_state.recipes.at[idx, col] = new_recipe_dict[col]
                             st.rerun()
                         else:
-                            st.warning("No similar recipes found. Try swapping a different meal.")
+                            st.error("Could not find a similar recipe for this meal type.")
