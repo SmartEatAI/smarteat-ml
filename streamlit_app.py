@@ -32,7 +32,8 @@ DIET_LABELS = {
     "vegan": "Vegan",
     "vegetarian": "Vegetarian",
     "low_calorie": "Low Calorie",
-    "high_fiber": "High Fiber"
+    "high_fiber": "High Fiber",
+    "high_carb": "High Carb"
 }
 
 MEAL_COLORS = {
@@ -42,7 +43,7 @@ MEAL_COLORS = {
     "Snack": "#16a085"
 }
 
-LABEL_COLORS = ["#8e44ad", "#16a085", "#c0392b", "#2980b9", "#f39c12", "#27ae60"]
+LABEL_COLORS = ["#8e44ad", "#16a085", "#c0392b", "#2980b9", "#f39c12", "#27ae60", "#d35400"]
 
 # --- UTILITIES ---
 def render_tags(tags, color="#34495e"):
