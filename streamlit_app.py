@@ -193,36 +193,66 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
 
     return pd.DataFrame(final_recipes)
 
-def swap_for_similar(recipe_id, meal_label, recommended_diets, selected_extra=None, n_search=50):
-    # Combinamos las dietas que el usuario quiere mantener
+def swap_for_similar(
+        recipe_id,
+        meal_label, 
+        recommended_diets, 
+        selected_extra=None, 
+        n_search=50,
+        exclude_ids=None
+):
+    if exclude_ids is None:
+        exclude_ids = set()
+    if selected_extra is None:
+        selected_extra = []
+
+    # Hard y soft constraints
     required_diets = set(normalize_label(d) for d in recommended_diets)
-    if selected_extra:
-        required_diets.update(normalize_label(d) for d in selected_extra)
+    extra_diets = set(normalize_label(d) for d in selected_extra)
 
     idx_list = df_recipes.index[df_recipes["id"] == recipe_id].tolist()
-    if not idx_list: return None
+    if not idx_list:
+        return None
 
-    # Buscamos vecinos cercanos
     recipe_vec = X_scaled_all[idx_list[0]].reshape(1, -1)
-    distances, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
+    _, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
 
-    for idx in indices[0]:
+    valid_candidates = []
+
+    for idx in indices[0][1:]:
         candidate = df_recipes.iloc[idx]
-        if candidate["id"] == recipe_id: continue # Saltar la misma
-        
-        # Validar tipo de comida (Crucial para el Swap)
+        rid = candidate["id"]
+
+        if rid == recipe_id or rid in exclude_ids:
+            continue
+
+        # Validar tipo de comida (hard)
         candidate_meals = [m.lower().strip() for m in safe_to_list(candidate["meal_type"])]
         if meal_label.lower() not in candidate_meals:
             continue
-            
-        # Validar dietas
-        candidate_diets = set(normalize_label(d) for d in safe_to_list(candidate["diet_type"]))
-        if required_diets.issubset(candidate_diets):
-            res = candidate.to_dict()
-            res['assigned_meal_type'] = meal_label
-            return res
 
-    return None
+        candidate_diets = set(
+            normalize_label(d) for d in safe_to_list(candidate["diet_type"])
+        )
+
+        # Hard constraint: dietas recomendadas
+        if not required_diets.issubset(candidate_diets):
+            continue
+
+        # Soft constraint: dietas extra
+        if extra_diets:
+            if candidate_diets & extra_diets:
+                valid_candidates.append(candidate)
+        else:
+            valid_candidates.append(candidate)
+
+    if not valid_candidates:
+        return None
+
+    chosen = valid_candidates[np.random.randint(len(valid_candidates))]
+    res = chosen.to_dict()
+    res["assigned_meal_type"] = meal_label
+    return res
 
 
 # --- CALCULATION FUNCTIONS ---
