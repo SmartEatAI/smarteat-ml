@@ -49,14 +49,13 @@ LABEL_COLORS = ["#8e44ad", "#16a085", "#c0392b", "#2980b9", "#f39c12", "#27ae60"
 
 #### Añadido para feature/meal_type ####
 def get_meal_order(n_meals):
-    if n_meals == 3:
-        return ["Breakfast", "Lunch", "Dinner"]
-    elif n_meals == 4:
-        return ["Breakfast", "Lunch", "Snack", "Dinner"]
-    elif n_meals == 5:
-        return ["Breakfast", "Snack", "Lunch", "Snack", "Dinner"]
-    else:  # 6 comidas
-        return ["Breakfast", "Snack", "Lunch", "Snack", "Dinner", "Snack"]
+    mapping = {
+        3: ["Breakfast", "Lunch", "Dinner"],
+        4: ["Breakfast", "Lunch", "Snack", "Dinner"],
+        5: ["Breakfast", "Snack", "Lunch", "Snack", "Dinner"],
+        6: ["Breakfast", "Snack", "Lunch", "Snack", "Dinner", "Snack"]
+    }
+    return mapping[n_meals]
 
 def render_tags(tags, color="#34495e"):
     html = ""
