@@ -173,40 +173,49 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
 
     return df_search.sort_values("dist").head(n).reset_index(drop=True)
 
-def swap_for_similar(recipe_id, selected_diets, n_search=20, exclude_ids=None):
+def swap_for_similar(
+    recipe_id,
+    selected_diets,
+    n_search=30,
+    exclude_ids=None
+):
     if exclude_ids is None:
         exclude_ids = set()
 
-    if not selected_diets:
-        return None
+    normalized_selected = set(normalize_label(d) for d in selected_diets)
 
-    normalized_diets = set(normalize_label(d) for d in selected_diets)
-
-    # Localizar la receta actual
     idx_list = df_recipes.index[df_recipes["id"] == recipe_id].tolist()
     if not idx_list:
         return None
 
-    idx_global = idx_list[0]
-    recipe_vec = X_scaled_all[idx_global].reshape(1, -1)
+    recipe_vec = X_scaled_all[idx_list[0]].reshape(1, -1)
+    _, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
 
-    # Buscar vecinos
-    dist, indices = knn.kneighbors(recipe_vec, n_neighbors=n_search)
+    exact = []
+    and_match = []
+    or_match = []
 
-    for idx in indices[0][1:]:  # saltamos la receta original
+    for idx in indices[0][1:]:
         row = df_recipes.iloc[idx]
-        candidate_id = row["id"]
+        rid = row["id"]
 
-        if candidate_id in exclude_ids:
+        if rid in exclude_ids:
             continue
 
-        # 🔥 FILTRO EXACTO DE DIETAS
-        candidate_diets = set(
+        candidate = set(
             normalize_label(d) for d in safe_to_list(row["diet_type"])
         )
 
-        if candidate_diets == normalized_diets:
-            return row.copy()
+        if candidate == normalized_selected:
+            exact.append(row)
+        elif normalized_selected.issubset(candidate):
+            and_match.append(row)
+        elif candidate & normalized_selected:
+            or_match.append(row)
+
+    for bucket in (exact, and_match, or_match):
+        if bucket:
+            return bucket[np.random.randint(len(bucket))].copy()
 
     return None
 
