@@ -22,7 +22,7 @@ def load_resources():
     return df, scaler, knn, X_scaled_all
 
 df_recipes, scaler, knn, X_scaled_all = load_resources()
-st.dataframe(df_recipes)
+#st.dataframe(df_recipes)
 
 FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
 MACRO_WEIGHTS = np.array([1.5, 0.8, 1.0, 1.2])  # Cal, Fat, Carb, Prot
