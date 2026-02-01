@@ -5,17 +5,17 @@ import json
 from joblib import load
 from streamlit_carousel_uui import uui_carousel
 
-# --- CONFIGURATION AND LOADING ---
+# --- CONFIGURACIÓN Y CARGA ---
 st.set_page_config(page_title="SmartEatAI")
 
 @st.cache_resource
 def load_resources():
-    # Load files
+    # Cargar archivos
     df = load("files/df_recetas.joblib")
     scaler = load("files/scaler.joblib")
     knn = load("files/knn.joblib")
 
-    # Pre-scale the entire dataset to avoid processing it in each recommendation, saving CPU
+    # Pre-escalamos el dataset completo para evitar procesarlo en cada recomendación
     FEATURES = ['calories', 'fat_content', 'carbohydrate_content', 'protein_content']
     X_scaled_all = scaler.transform(df[FEATURES])
 
@@ -46,10 +46,10 @@ MEAL_COLORS = {
 
 LABEL_COLORS = ["#8e44ad", "#16a085", "#c0392b", "#2980b9", "#f39c12", "#27ae60", "#d35400"]
 
-# --- UTILITIES ---
+# --- UTILIDADES ---
 
-#### Añadido para feature/meal_type ####
 def get_meal_order(n_meals):
+    # Obtiene el orden de comidas según la cantidad diaria seleccionada
     mapping = {
         3: ["Breakfast", "Lunch", "Dinner"],
         4: ["Breakfast", "Lunch", "Snack", "Dinner"],
@@ -74,27 +74,24 @@ def render_diet_tags(diets):
 
 def safe_to_list(value):
     """
-    Converts various formats to a list of strings:
-    - Real list -> list
-    - JSON string -> list
-    - Comma-separated string -> list
+    Convierte varios formatos a una lista de strings:
+    - Lista real -> lista
+    - String JSON -> lista
+    - String separado por comas -> lista
     - None / NaN -> []
     """
     if value is None:
         return []
 
-    # If it's already a list
     if isinstance(value, list):
         return [str(v).strip() for v in value if str(v).strip()]
 
-    # If it's a string
     if isinstance(value, str):
         value = value.strip()
 
         if not value:
             return []
 
-        # Try JSON
         try:
             parsed = json.loads(value)
             if isinstance(parsed, list):
@@ -102,12 +99,12 @@ def safe_to_list(value):
         except Exception:
             pass
 
-        # Fallback: comma-separated
         return [v.strip() for v in value.split(",") if v.strip()]
 
     return []
 
 def normalize_label(s):
+    # Normaliza etiquetas para comparación consistente
     if s is None:
         return ""
     return (
@@ -119,6 +116,7 @@ def normalize_label(s):
     )
 
 def get_used_recipe_ids(exclude_id=None):
+    # Obtiene los IDs de recetas ya mostradas en el plan
     if (
         "recipes" not in st.session_state
         or st.session_state.recipes is None
@@ -134,8 +132,8 @@ def get_used_recipe_ids(exclude_id=None):
 
     return ids
 
-#### Modificado para feature/meal_type ####
 def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
+    # Recomienda recetas basadas en macros y preferencias dietéticas
     if used_ids is None:
         used_ids = set()
 
@@ -143,7 +141,6 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
     final_recipes = []
     current_used_ids = used_ids.copy()
 
-    # Normalizamos las dietas seleccionadas por el usuario para comparar
     user_diet_set = set(normalize_label(d) for d in diets)
 
     for meal_label in meal_order:
@@ -155,26 +152,24 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
         ]])
         user_scaled = scaler.transform(user_vec) * MACRO_WEIGHTS
 
-        # --- FILTRADO INTELIGENTE ---
-        # 1. Filtro de Dieta: La receta DEBE tener al menos las dietas seleccionadas (o ser compatible)
+        # FILTRO INTELIGENTE
+        # Filtro de dieta: la receta DEBE tener las dietas seleccionadas
         def check_diet(recipe_diets):
             r_diets = set(normalize_label(d) for d in safe_to_list(recipe_diets))
             return user_diet_set.issubset(r_diets)
 
-        # 2. Filtro de Tipo de Comida: Que incluya la etiqueta actual (ej: 'Breakfast')
+        # Filtro de tipo de comida: debe incluir el tipo actual
         def check_meal(recipe_meals, target):
             r_meals = [m.lower().strip() for m in safe_to_list(recipe_meals)]
             return target.lower() in r_meals
 
         mask_diet = df_recipes["diet_type"].apply(check_diet)
         mask_meal = df_recipes["meal_type"].apply(lambda x: check_meal(x, meal_label))
-        
+
         mask_combined = mask_diet & mask_meal
         valid_indices = np.where(mask_combined)[0]
-        
+
         df_search = df_recipes.iloc[valid_indices].copy()
-        
-        # Excluir IDs ya usados
         df_search = df_search[~df_search["id"].isin(current_used_ids)]
 
         if not df_search.empty:
@@ -182,7 +177,7 @@ def recommend_recipes(macros_obj, diets, n=3, used_ids=None):
             X_search = X_scaled_all[df_search.index] * MACRO_WEIGHTS
             distances = np.linalg.norm(X_search - user_scaled, axis=1)
             df_search["dist"] = distances
-            
+
             best_recipe = df_search.sort_values("dist").iloc[0].to_dict()
             best_recipe['assigned_meal_type'] = meal_label 
             final_recipes.append(best_recipe)
@@ -201,12 +196,13 @@ def swap_for_similar(
         n_search=50,
         exclude_ids=None
 ):
+    # Busca recetas similares por macros para reemplazar la actual
     if exclude_ids is None:
         exclude_ids = set()
     if selected_extra is None:
         selected_extra = []
 
-    # Hard y soft constraints
+    # Restricciones
     required_diets = set(normalize_label(d) for d in recommended_diets)
     extra_diets = set(normalize_label(d) for d in selected_extra)
 
@@ -226,7 +222,7 @@ def swap_for_similar(
         if rid == recipe_id or rid in exclude_ids:
             continue
 
-        # Validar tipo de comida (hard)
+        # Validar que sea del mismo tipo de comida
         candidate_meals = [m.lower().strip() for m in safe_to_list(candidate["meal_type"])]
         if meal_label.lower() not in candidate_meals:
             continue
@@ -235,11 +231,11 @@ def swap_for_similar(
             normalize_label(d) for d in safe_to_list(candidate["diet_type"])
         )
 
-        # Hard constraint: dietas recomendadas
+        # Debe cumplir con todas las dietas recomendadas
         if not required_diets.issubset(candidate_diets):
             continue
 
-        # Soft constraint: dietas extra
+        # Preferencia por dietas adicionales
         if extra_diets:
             if candidate_diets & extra_diets:
                 valid_candidates.append(candidate)
@@ -255,24 +251,26 @@ def swap_for_similar(
     return res
 
 
-# --- CALCULATION FUNCTIONS ---
+# --- FUNCIONES DE CÁLCULO ---
 def estimate_bodyfat(sex, category):
+    # Estima el porcentaje de grasa corporal según tipo corporal
     mapping = {
         "Male": {"Lean": 12, "Normal": 18, "Stocky": 25, "Obese": 32},
         "Female": {"Lean": 20, "Normal": 26, "Stocky": 33, "Obese": 40}
     }
     return mapping[sex][category]
 
-# Function to calculate user macros based on input data
 def calculate_macros(sex, age, height, weight, bodyfat_pct, activity, goal):
+    # Calcula los macros diarios según perfil del usuario
     lean_mass = weight * (1 - bodyfat_pct / 100)
 
-    # Body Mass Index (BMI)
+    # Metabolismo basal (BMR) según sexo
     if sex == "Male":
         bmr = 10 * weight + 6.25 * height - 5 * age + 5
     else:
         bmr = 10 * weight + 6.25 * height - 5 * age - 161
 
+    # Factores de actividad física
     factors = {
         "Sedentary": 1.2,
         "Light": 1.375,
@@ -281,10 +279,10 @@ def calculate_macros(sex, age, height, weight, bodyfat_pct, activity, goal):
         "Very High": 1.9
     }
 
-    # Total Daily Energy Expenditure
+    # Gasto energético diario total (TDEE)
     tdee = bmr * factors[activity]
 
-    # Recommendation of calories, proteins, and diet type
+    # Recomendaciones personalizadas según objetivo
     if goal == "Gain Muscle":
         calories = tdee * 1.1 + 150
         protein = lean_mass * 2.2
@@ -309,15 +307,13 @@ def calculate_macros(sex, age, height, weight, bodyfat_pct, activity, goal):
         "recommended_diets": diets
     }
 
-# --- INTERFACE ---
-
+# --- INTERFAZ ---
 st.title("🥗 SmartEatAI")
 st.caption("Intelligent meal recommender based on your macros")
 
 st.header("Profile Setup")
 
 with st.form("user_form", border=True):
-    # Row 1: Basic Data (3 columns to make use of width)
     form_col1, form_col2, form_col3 = st.columns(3)
 
     with form_col1:
@@ -344,17 +340,16 @@ with st.form("user_form", border=True):
             ["Gain Muscle", "Lose Weight", "Maintenance"]
         )
 
-    # Centered and highlighted button
     submit = st.form_submit_button("Generate Personalized Plan", use_container_width=True, type="primary")
 
 if submit:
     bodyfat_pct = estimate_bodyfat(sex, body_type)
     macros = calculate_macros(sex, age, height, weight, bodyfat_pct, activity, goal)
-    st.session_state.macros = macros  # Save macros in session
-    # Reset previous diet state so recipes are regenerated
+    st.session_state.macros = macros  # Guarda los macros en el estado de la sesión
+    # Reinicia las recetas previas
     st.session_state.pop("prev_selected_diets", None)
 
-# --- DIET SELECTOR ---
+# --- SELECTOR DE DIETA ---
 if "macros" in st.session_state:
     macros = st.session_state.macros
     recommended = macros["recommended_diets"]
@@ -374,6 +369,7 @@ if "macros" in st.session_state:
     )
 
     def labels_to_keys(selected_labels):
+        # Convierte etiquetas de UI a claves de dieta
         keys = []
         for s in selected_labels:
             clean = s.replace(" [Recommended]", "")
@@ -403,7 +399,7 @@ if "macros" in st.session_state:
 
     st.session_state.selected_diets = selected_diets
 
-# --- DISPLAY ---
+# --- VISUALIZACIÓN ---
 if "macros" in st.session_state:
     macros = st.session_state.macros
     total_protein = 0
@@ -447,29 +443,26 @@ if "recipes" in st.session_state:
     else:
         st.subheader("🍽️ Recommended Meals")
 
-        # Show recipes
         for idx, row in df_rec.iterrows():
             meal_title = row.get('assigned_meal_type', f"Meal {idx+1}")
 
-            # Create a unique container for each recipe
             with st.container(border=True):
                 st.subheader(f"🍴 {meal_title}: {row['name']}")
 
                 c1, c2 = st.columns([1, 2])
 
                 with c1:
-                    # SOLUTION TO DUPLICATE ID: Add a unique key based on ID and index
                     imgs = row['images'].split(", ")
                     slides = [{"image": url, "title": "", "description": ""} for url in imgs[:3]]
 
                     uui_carousel(
                         items=slides,
                         variant="sm",
-                        key=f"carousel_{row['id']}_{idx}"  # <--- Unique key here
+                        key=f"carousel_{row['id']}_{idx}"
                     )
 
                 with c2:
-                    # Show meal types (Breakfast, Lunch, Dinner, Snack) if they exist
+                    # Mostrar tipos de comida (Desayuno, Almuerzo, Cena, Merienda)
                     meal_types = row.get("meal_type", [])
                     if isinstance(meal_types, str):
                         meal_types = json.loads(meal_types)
@@ -484,7 +477,7 @@ if "recipes" in st.session_state:
                         )
                     st.markdown(tags_html, unsafe_allow_html=True)
 
-                    # Show diet types if they exist
+                    # Mostrar los tipos de dieta
                     diet_types = safe_to_list(row.get("diet_type"))
                     if diet_types:
                         render_diet_tags(diet_types)
@@ -493,11 +486,11 @@ if "recipes" in st.session_state:
                     st.write(f"**🥩 Protein:** {row['protein_content']}g | **🥑 Fat:** {row['fat_content']}g | **🍞 Carbs:** {row['carbohydrate_content']}g")
                     st.write(f"**🛒 Ingredients:** {row["recipe_ingredient_parts"]}")
 
-                    # Swap button with safe logic
+                    # Lógica de swap de receta
                     if st.button(f"🔄 Swap for similar", key=f"btn_swp_{row['id']}_{idx}"):
-                        # Get IDs of currently shown recipes (except the current one)
+                        # Obetener los ids actuales para excluirlos
                         current_ids = set(st.session_state.recipes["id"].tolist())
-                        current_ids.discard(row['id'])  # Do not exclude the current recipe from candidate
+                        current_ids.discard(row['id'])
 
                         new_recipe_dict = swap_for_similar(
                             recipe_id=row['id'],
