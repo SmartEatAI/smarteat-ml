@@ -6,8 +6,9 @@ SmartEatAI es una aplicación web interactiva que proporciona recomendaciones pe
 
 Utiliza algoritmos avanzados de machine learning (KNN) para recomendar recetas que coincidan con tus macronutrientes estimados según ecuaciones científicas de nutrición.
 
-Link a la [app desplegada en Streamlit](https://smarteat-ml-rec.streamlit.app/)
-Link al [video explicativo](https://youtu.be/QQojlJ8lJp0)
+Link a la [app desplegada en Streamlit](https://smarteat-ml-rec.streamlit.app/).
+
+Link al [video explicativo](https://youtu.be/QQojlJ8lJp0).
 
 ---
 
