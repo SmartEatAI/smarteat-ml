@@ -157,8 +157,8 @@ Los deltas muestran la comparación:
 
 ### Ecuación Mifflin-St Jeor
 ```
-Para Hombres:   BMR = 10×peso(kg) + 6.25×altura(cm) - 5×edad + 5
-Para Mujeres:   BMR = 10×peso(kg) + 6.25×altura(cm) - 5×edad - 161
+Para Hombres:   BMR = 10 * peso(kg) + 6.25 * altura(cm) - 5 * edad + 5
+Para Mujeres:   BMR = 10 * peso(kg) + 6.25 * altura(cm) - 5 * edad - 161
 ```
 
 ### TDEE (Total Daily Energy Expenditure)
@@ -190,8 +190,6 @@ smarteat-ml/
 ├── requirements.txt              # Dependencias Python
 ├── Dockerfile                    # Configuración Docker
 ├── docker-compose.yml            # Orquestación Docker
-├── data/
-│   └── foods_allergens_diets_limpio.csv  # Dataset de recetas
 ├── files/
 │   ├── df_recetas.joblib        # DataFrame serializado
 │   ├── knn.joblib               # Modelo KNN entrenado
