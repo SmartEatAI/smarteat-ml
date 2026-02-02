@@ -55,6 +55,7 @@ Link al [video explicativo](https://youtu.be/QQojlJ8lJp0).
 
 1. **Clonar el repositorio**
    ```bash
+   git clone https://github.com/SmartEatAI/smarteat-ml.git
    cd smarteat-ml
    ```
 - **Opción 1: Local**
